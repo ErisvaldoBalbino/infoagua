@@ -1,4 +1,4 @@
-import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
+import { ClassSerializerInterceptor, ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -26,6 +26,12 @@ async function bootstrap() {
 
   // CORS
   app.enableCors();
+
+  // Versionamento URI global, todas as rotas ficam em /v1/
+  app.enableVersioning({
+    type: VersioningType.URI,
+    defaultVersion: '1',
+  });
 
   // Swagger
   const swaggerConfig = new DocumentBuilder()
