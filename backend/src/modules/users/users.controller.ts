@@ -16,6 +16,7 @@ import {
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { PublicProfileDto } from './dto/public-profile.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { UsersService } from './users.service';
@@ -27,11 +28,11 @@ export class UsersController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Perfil público de um usuário' })
-  @ApiResponse({ status: 200, type: UserResponseDto })
+  @ApiResponse({ status: 200, type: PublicProfileDto })
   @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
   findById(
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<UserResponseDto> {
+  ): Promise<PublicProfileDto> {
     return this.usersService.findById(id);
   }
 

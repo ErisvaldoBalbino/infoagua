@@ -3,11 +3,15 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { UsersService } from './users.service';
 
-const mockUser = {
+const mockPublicUser = {
   id: 'uuid-1',
   name: 'José Silva',
-  email: 'jose@example.com',
   createdAt: new Date('2026-01-01'),
+};
+
+const mockFullUser = {
+  ...mockPublicUser,
+  email: 'jose@example.com',
 };
 
 describe('UsersService', () => {
@@ -39,15 +43,16 @@ describe('UsersService', () => {
   // ─── findById ─────────────────────────────────────────────────────────────
 
   describe('findById', () => {
-    it('deve retornar usuário existente', async () => {
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
+    it('deve retornar perfil público sem email', async () => {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockPublicUser);
 
-      const result = await service.findById(mockUser.id);
+      const result = await service.findById(mockPublicUser.id);
 
       expect(prisma.user.findUnique).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: mockUser.id } }),
+        expect.objectContaining({ where: { id: mockPublicUser.id } }),
       );
-      expect(result).toEqual(mockUser);
+      expect(result).toEqual(mockPublicUser);
+      expect(result).not.toHaveProperty('email');
     });
 
     it('deve lançar NotFoundException se usuário não encontrado', async () => {
@@ -62,19 +67,29 @@ describe('UsersService', () => {
   // ─── updateMe ─────────────────────────────────────────────────────────────
 
   describe('updateMe', () => {
-    it('deve atualizar o name do usuário correto', async () => {
-      const updated = { ...mockUser, name: 'Novo Nome' };
+    it('deve atualizar o name do usuário correto e retornar perfil completo (com email)', async () => {
+      const updated = { ...mockFullUser, name: 'Novo Nome' };
       (prisma.user.update as jest.Mock).mockResolvedValue(updated);
 
-      const result = await service.updateMe(mockUser.id, { name: 'Novo Nome' });
+      const result = await service.updateMe(mockFullUser.id, { name: 'Novo Nome' });
 
       expect(prisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: mockUser.id },
+          where: { id: mockFullUser.id },
           data: { name: 'Novo Nome' },
         }),
       );
       expect(result.name).toBe('Novo Nome');
+      expect(result).toHaveProperty('email');
+    });
+
+    it('deve lançar NotFoundException quando Prisma retorna P2025 (registro não existe)', async () => {
+      (prisma.user.update as jest.Mock).mockRejectedValue({ code: 'P2025' });
+
+      await expect(
+        service.updateMe('uuid-nao-existe', { name: 'x' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 });
+

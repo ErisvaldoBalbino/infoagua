@@ -2,11 +2,15 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 
-const mockUser = {
+const mockPublicUser = {
   id: 'uuid-1',
   name: 'José Silva',
-  email: 'jose@example.com',
   createdAt: new Date('2026-01-01'),
+};
+
+const mockFullUser = {
+  ...mockPublicUser,
+  email: 'jose@example.com',
 };
 
 describe('UsersController', () => {
@@ -20,8 +24,8 @@ describe('UsersController', () => {
         {
           provide: UsersService,
           useValue: {
-            findById: jest.fn().mockResolvedValue(mockUser),
-            updateMe: jest.fn().mockResolvedValue({ ...mockUser, name: 'Novo Nome' }),
+            findById: jest.fn().mockResolvedValue(mockPublicUser),
+            updateMe: jest.fn().mockResolvedValue({ ...mockFullUser, name: 'Novo Nome' }),
           },
         },
       ],
@@ -36,11 +40,12 @@ describe('UsersController', () => {
   // ─── GET /users/:id ───────────────────────────────────────────────────────
 
   describe('GET /users/:id', () => {
-    it('deve retornar UserResponseDto para usuário existente', async () => {
-      const result = await controller.findById(mockUser.id);
+    it('deve retornar PublicProfileDto (sem email) para usuário existente', async () => {
+      const result = await controller.findById(mockPublicUser.id);
 
-      expect(usersService.findById).toHaveBeenCalledWith(mockUser.id);
-      expect(result).toEqual(mockUser);
+      expect(usersService.findById).toHaveBeenCalledWith(mockPublicUser.id);
+      expect(result).toEqual(mockPublicUser);
+      expect(result).not.toHaveProperty('email');
     });
   });
 
