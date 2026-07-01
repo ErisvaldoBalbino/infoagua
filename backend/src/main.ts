@@ -31,7 +31,7 @@ async function bootstrap() {
   const swaggerConfig = new DocumentBuilder()
     .setTitle('InfoÁgua API')
     .setDescription(
-      'API para monitoramento colaborativo do abastecimento de água no semiárido nordestino.',
+      'API para aplicação de monitoramento colaborativo do abastecimento de água no semiárido nordestino.',
     )
     .setVersion('1.0')
     .addBearerAuth(
