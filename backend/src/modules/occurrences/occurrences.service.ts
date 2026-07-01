@@ -125,55 +125,54 @@ export class OccurrencesService {
     return mapToResponse(raw);
   }
 
-  // ─── Update ─────────────────────────────────────────────────────────────────
+  // ─── Update ──────────────────────────────────────────────────────────────────────────
 
   async update(
     id: string,
     userId: string,
     dto: UpdateOccurrenceDto,
   ): Promise<OccurrenceResponseDto> {
-    const occurrence = await this.prisma.occurrence.findUnique({
-      where: { id },
-      select: { id: true, userId: true },
+    // Atomic: ownership check and mutation in one statement
+    const { count } = await this.prisma.occurrence.updateMany({
+      where: { id, userId },
+      data: dto,
     });
 
-    if (!occurrence) {
-      throw new NotFoundException('Ocorrência não encontrada.');
+    if (count === 0) {
+      // Diagnose 404 vs 403 — read-only lookup, mutation already guarded above
+      const exists = await this.prisma.occurrence.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+      if (!exists) throw new NotFoundException('Ocorrência não encontrada.');
+      throw new ForbiddenException('Você não tem permissão para editar esta ocorrência.');
     }
 
-    if (occurrence.userId !== userId) {
-      throw new ForbiddenException(
-        'Você não tem permissão para editar esta ocorrência.',
-      );
-    }
-
-    const raw = await this.prisma.occurrence.update({
+    // Fetch full response shape after successful update
+    const raw = await this.prisma.occurrence.findUnique({
       where: { id },
-      data: dto,
       select: OCCURRENCE_DETAIL_SELECT,
     });
 
-    return mapToResponse(raw);
+    return mapToResponse(raw!);
   }
 
-  // ─── Remove ─────────────────────────────────────────────────────────────────
+  // ─── Remove ──────────────────────────────────────────────────────────────────────────
 
   async remove(id: string, userId: string): Promise<void> {
-    const occurrence = await this.prisma.occurrence.findUnique({
-      where: { id },
-      select: { id: true, userId: true },
+    // Atomic: ownership check and deletion in one statement
+    const { count } = await this.prisma.occurrence.deleteMany({
+      where: { id, userId },
     });
 
-    if (!occurrence) {
-      throw new NotFoundException('Ocorrência não encontrada.');
+    if (count === 0) {
+      // Diagnose 404 vs 403 — read-only lookup, mutation already guarded above
+      const exists = await this.prisma.occurrence.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+      if (!exists) throw new NotFoundException('Ocorrência não encontrada.');
+      throw new ForbiddenException('Você não tem permissão para remover esta ocorrência.');
     }
-
-    if (occurrence.userId !== userId) {
-      throw new ForbiddenException(
-        'Você não tem permissão para remover esta ocorrência.',
-      );
-    }
-
-    await this.prisma.occurrence.delete({ where: { id } });
   }
 }

@@ -61,8 +61,8 @@ describe('OccurrencesService', () => {
               create: jest.fn(),
               findMany: jest.fn(),
               findUnique: jest.fn(),
-              update: jest.fn(),
-              delete: jest.fn(),
+              updateMany: jest.fn(),
+              deleteMany: jest.fn(),
             },
           },
         },
@@ -204,21 +204,24 @@ describe('OccurrencesService', () => {
 
   describe('update', () => {
     it('deve atualizar a ocorrência do próprio usuário', async () => {
-      (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue(ownershipRow);
-      (prisma.occurrence.update as jest.Mock).mockResolvedValue({
+      // updateMany matches id+userId → count 1 → then findUnique for response
+      (prisma.occurrence.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+      (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue({
         ...rawOccurrence,
         description: 'Atualizado',
       });
 
       const result = await service.update(OCC_ID, OWNER_ID, { description: 'Atualizado' });
 
-      expect(prisma.occurrence.update).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: OCC_ID }, data: { description: 'Atualizado' } }),
+      expect(prisma.occurrence.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: OCC_ID, userId: OWNER_ID }, data: { description: 'Atualizado' } }),
       );
       expect(result).toBeDefined();
     });
 
     it('deve lançar NotFoundException se ocorrência não existe', async () => {
+      // updateMany returns 0 (no record at all) → diagnostic findUnique also null
+      (prisma.occurrence.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
       (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue(null);
 
       await expect(service.update('nao-existe', OWNER_ID, {})).rejects.toBeInstanceOf(
@@ -227,7 +230,9 @@ describe('OccurrencesService', () => {
     });
 
     it('deve lançar ForbiddenException se usuário não é o dono', async () => {
-      (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue(ownershipRow);
+      // updateMany returns 0 (wrong userId) → diagnostic findUnique finds the record
+      (prisma.occurrence.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+      (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue({ id: OCC_ID });
 
       await expect(service.update(OCC_ID, OTHER_ID, {})).rejects.toBeInstanceOf(
         ForbiddenException,
@@ -239,15 +244,15 @@ describe('OccurrencesService', () => {
 
   describe('remove', () => {
     it('deve remover a ocorrência do próprio usuário', async () => {
-      (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue(ownershipRow);
-      (prisma.occurrence.delete as jest.Mock).mockResolvedValue(undefined);
+      (prisma.occurrence.deleteMany as jest.Mock).mockResolvedValue({ count: 1 });
 
       await service.remove(OCC_ID, OWNER_ID);
 
-      expect(prisma.occurrence.delete).toHaveBeenCalledWith({ where: { id: OCC_ID } });
+      expect(prisma.occurrence.deleteMany).toHaveBeenCalledWith({ where: { id: OCC_ID, userId: OWNER_ID } });
     });
 
     it('deve lançar NotFoundException se ocorrência não existe', async () => {
+      (prisma.occurrence.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
       (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue(null);
 
       await expect(service.remove('nao-existe', OWNER_ID)).rejects.toBeInstanceOf(
@@ -256,7 +261,8 @@ describe('OccurrencesService', () => {
     });
 
     it('deve lançar ForbiddenException se usuário não é o dono', async () => {
-      (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue(ownershipRow);
+      (prisma.occurrence.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
+      (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue({ id: OCC_ID });
 
       await expect(service.remove(OCC_ID, OTHER_ID)).rejects.toBeInstanceOf(
         ForbiddenException,
