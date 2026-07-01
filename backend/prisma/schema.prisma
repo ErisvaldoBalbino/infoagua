@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Enums
+
+enum OccurrenceType {
+  shortage // Falta d'água
+  return   // Retorno do abastecimento
+  quality  // Problema de qualidade
+  leak     // Vazamento
+}
+
+// Models
+
+model User {
+  id           String   @id @default(uuid())
+  name         String   @db.VarChar(100)
+  email        String   @unique @db.VarChar(150)
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  occurrences Occurrence[]
+  comments    Comment[]
+  likes       Like[]
+
+  @@map("users")
+}
+
+model Occurrence {
+  id          String         @id @default(uuid())
+  userId      String         @map("user_id")
+  type        OccurrenceType
+  description String?        @db.Text
+  latitude    Decimal        @db.Decimal(9, 6)
+  longitude   Decimal        @db.Decimal(9, 6)
+  city        String         @db.VarChar(100)
+  photoUrl    String?        @map("photo_url") @db.Text
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments Comment[]
+  likes    Like[]
+
+  @@index([userId])
+  @@index([type])
+  @@index([city])
+  @@index([type, city])
+  @@index([createdAt])
+  @@map("occurrences")
+}
+
+model Comment {
+  id           String   @id @default(uuid())
+  occurrenceId String   @map("occurrence_id")
+  userId       String   @map("user_id")
+  content      String   @db.Text
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  occurrence Occurrence @relation(fields: [occurrenceId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([occurrenceId])
+  @@index([userId])
+  @@map("comments")
+}
+
+model Like {
+  userId       String   @map("user_id")
+  occurrenceId String   @map("occurrence_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  occurrence Occurrence @relation(fields: [occurrenceId], references: [id], onDelete: Cascade)
+
+  @@id([userId, occurrenceId])
+  @@map("likes")
+}
