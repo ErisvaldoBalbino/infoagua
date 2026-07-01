@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { PrismaModule } from './common/prisma/prisma.module';
 import configuration from './config/configuration';
 import { validate } from './config/env.validation';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
@@ -13,7 +14,8 @@ import { validate } from './config/env.validation';
       validate,
     }),
     PrismaModule,
-    // AuthModule, UsersModule, OccurrencesModule, CommentsModule, LikesModule, StorageModule, WeatherModule
+    AuthModule,
+    // UsersModule, OccurrencesModule, CommentsModule, LikesModule, StorageModule, WeatherModule
   ],
   controllers: [AppController],
 })
