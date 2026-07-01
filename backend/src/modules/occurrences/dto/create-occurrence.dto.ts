@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  MaxLength,
   MinLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -15,9 +16,10 @@ export class CreateOccurrenceDto {
   @IsEnum(OccurrenceType)
   type!: OccurrenceType;
 
-  @ApiPropertyOptional({ description: 'Descrição detalhada' })
+  @ApiPropertyOptional({ description: 'Descrição detalhada', maxLength: 1000 })
   @IsOptional()
   @IsString()
+  @MaxLength(1000)
   description?: string;
 
   @ApiProperty({ example: -8.0476, description: 'Latitude' })
@@ -28,9 +30,10 @@ export class CreateOccurrenceDto {
   @IsLongitude()
   longitude!: number;
 
-  @ApiProperty({ example: 'Recife', description: 'Cidade da ocorrência' })
+  @ApiProperty({ example: 'Recife', description: 'Cidade da ocorrência', maxLength: 100 })
   @IsString()
   @MinLength(2)
+  @MaxLength(100)
   city!: string;
 
   @ApiPropertyOptional({ description: 'URL da foto' })
