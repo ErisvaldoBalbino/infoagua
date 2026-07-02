@@ -1,8 +1,8 @@
 ---
-name: Frontend Feature
+name: Mobile Feature
 about: Funcionalidades do frontend
 title: ''
-labels: enhancement, frontend
+labels: enhancement, mobile
 assignees: ErisvaldoBalbino
 
 ---
