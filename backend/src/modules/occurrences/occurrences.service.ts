@@ -75,7 +75,9 @@ export class OccurrencesService {
 
   // ─── FindAll (cursor pagination) ────────────────────────────────────────────
 
-  async findAll(filter: FilterOccurrencesDto): Promise<OccurrenceResponseDto[]> {
+  async findAll(
+    filter: FilterOccurrencesDto,
+  ): Promise<OccurrenceResponseDto[]> {
     const { type, city, cursor, limit = 20 } = filter;
 
     const rows = await this.prisma.occurrence.findMany({
@@ -145,7 +147,9 @@ export class OccurrencesService {
         select: { id: true },
       });
       if (!exists) throw new NotFoundException('Ocorrência não encontrada.');
-      throw new ForbiddenException('Você não tem permissão para editar esta ocorrência.');
+      throw new ForbiddenException(
+        'Você não tem permissão para editar esta ocorrência.',
+      );
     }
 
     // Fetch full response shape after successful update
@@ -172,7 +176,9 @@ export class OccurrencesService {
         select: { id: true },
       });
       if (!exists) throw new NotFoundException('Ocorrência não encontrada.');
-      throw new ForbiddenException('Você não tem permissão para remover esta ocorrência.');
+      throw new ForbiddenException(
+        'Você não tem permissão para remover esta ocorrência.',
+      );
     }
   }
 }

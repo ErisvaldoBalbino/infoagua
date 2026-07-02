@@ -127,8 +127,13 @@ export class OccurrencesController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Toggle like em uma ocorrência (curtir / descurtir)' })
-  @ApiResponse({ status: 200, description: '{ liked: true } ou { liked: false }' })
+  @ApiOperation({
+    summary: 'Toggle like em uma ocorrência (curtir / descurtir)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '{ liked: true } ou { liked: false }',
+  })
   @ApiResponse({ status: 401, description: 'Token ausente ou inválido' })
   @ApiResponse({ status: 404, description: 'Ocorrência não encontrada' })
   toggleLike(

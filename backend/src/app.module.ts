@@ -24,7 +24,7 @@ import { WeatherModule } from './modules/weather/weather.module';
     OccurrencesModule,
     CommentsModule,
     StorageModule,
-    WeatherModule
+    WeatherModule,
   ],
   controllers: [AppController],
 })

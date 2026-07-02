@@ -25,7 +25,9 @@ describe('UsersController', () => {
           provide: UsersService,
           useValue: {
             findById: jest.fn().mockResolvedValue(mockPublicUser),
-            updateMe: jest.fn().mockResolvedValue({ ...mockFullUser, name: 'Novo Nome' }),
+            updateMe: jest
+              .fn()
+              .mockResolvedValue({ ...mockFullUser, name: 'Novo Nome' }),
           },
         },
       ],

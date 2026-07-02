@@ -1,7 +1,4 @@
-import {
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CommentsService } from './comments.service';
@@ -57,17 +54,24 @@ describe('CommentsService', () => {
 
   describe('create', () => {
     it('deve criar comentário vinculado à ocorrência e ao usuário', async () => {
-      (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue({ id: OCC_ID });
+      (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue({
+        id: OCC_ID,
+      });
       (prisma.comment.create as jest.Mock).mockResolvedValue(rawComment);
 
-      const result = await service.create(OCC_ID, OWNER_ID, { content: 'Ótima ocorrência!' });
+      const result = await service.create(OCC_ID, OWNER_ID, {
+        content: 'Ótima ocorrência!',
+      });
 
       expect(prisma.occurrence.findUnique).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: OCC_ID } }),
       );
       expect(prisma.comment.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ occurrenceId: OCC_ID, userId: OWNER_ID }),
+          data: expect.objectContaining({
+            occurrenceId: OCC_ID,
+            userId: OWNER_ID,
+          }),
         }),
       );
       expect(result.id).toBe(COMMENT_ID);
@@ -89,8 +93,16 @@ describe('CommentsService', () => {
 
   describe('findByOccurrence', () => {
     it('deve retornar lista de comentários ordenada por createdAt asc', async () => {
-      const older = { ...rawComment, id: 'c1', createdAt: new Date('2026-01-01') };
-      const newer = { ...rawComment, id: 'c2', createdAt: new Date('2026-01-02') };
+      const older = {
+        ...rawComment,
+        id: 'c1',
+        createdAt: new Date('2026-01-01'),
+      };
+      const newer = {
+        ...rawComment,
+        id: 'c2',
+        createdAt: new Date('2026-01-02'),
+      };
       (prisma.comment.findMany as jest.Mock).mockResolvedValue([older, newer]);
 
       const result = await service.findByOccurrence(OCC_ID);
@@ -123,14 +135,16 @@ describe('CommentsService', () => {
       (prisma.comment.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
       (prisma.comment.findUnique as jest.Mock).mockResolvedValue(null);
 
-      await expect(service.remove('nao-existe', OWNER_ID)).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        service.remove('nao-existe', OWNER_ID),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('deve lançar ForbiddenException se usuário não é o dono', async () => {
       (prisma.comment.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
-      (prisma.comment.findUnique as jest.Mock).mockResolvedValue({ id: COMMENT_ID });
+      (prisma.comment.findUnique as jest.Mock).mockResolvedValue({
+        id: COMMENT_ID,
+      });
 
       await expect(service.remove(COMMENT_ID, OTHER_ID)).rejects.toBeInstanceOf(
         ForbiddenException,

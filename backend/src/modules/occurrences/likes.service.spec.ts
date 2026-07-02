@@ -44,9 +44,14 @@ describe('LikesService', () => {
 
   describe('toggle', () => {
     it('deve criar like se não existe (curtir)', async () => {
-      (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue({ id: OCC_ID });
+      (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue({
+        id: OCC_ID,
+      });
       (prisma.like.findUnique as jest.Mock).mockResolvedValue(null);
-      (prisma.like.create as jest.Mock).mockResolvedValue({ userId: USER_ID, occurrenceId: OCC_ID });
+      (prisma.like.create as jest.Mock).mockResolvedValue({
+        userId: USER_ID,
+        occurrenceId: OCC_ID,
+      });
 
       const result = await service.toggle(OCC_ID, USER_ID);
 
@@ -58,14 +63,23 @@ describe('LikesService', () => {
     });
 
     it('deve remover like se já existe (descurtir)', async () => {
-      (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue({ id: OCC_ID });
-      (prisma.like.findUnique as jest.Mock).mockResolvedValue({ userId: USER_ID });
-      (prisma.like.delete as jest.Mock).mockResolvedValue({ userId: USER_ID, occurrenceId: OCC_ID });
+      (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue({
+        id: OCC_ID,
+      });
+      (prisma.like.findUnique as jest.Mock).mockResolvedValue({
+        userId: USER_ID,
+      });
+      (prisma.like.delete as jest.Mock).mockResolvedValue({
+        userId: USER_ID,
+        occurrenceId: OCC_ID,
+      });
 
       const result = await service.toggle(OCC_ID, USER_ID);
 
       expect(prisma.like.delete).toHaveBeenCalledWith({
-        where: { userId_occurrenceId: { userId: USER_ID, occurrenceId: OCC_ID } },
+        where: {
+          userId_occurrenceId: { userId: USER_ID, occurrenceId: OCC_ID },
+        },
       });
       expect(prisma.like.create).not.toHaveBeenCalled();
       expect(result).toEqual({ liked: false });
@@ -74,7 +88,9 @@ describe('LikesService', () => {
     it('deve lançar NotFoundException se ocorrência não existe', async () => {
       (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue(null);
 
-      await expect(service.toggle('nao-existe', USER_ID)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(
+        service.toggle('nao-existe', USER_ID),
+      ).rejects.toBeInstanceOf(NotFoundException);
 
       expect(prisma.like.findUnique).not.toHaveBeenCalled();
       expect(prisma.like.create).not.toHaveBeenCalled();

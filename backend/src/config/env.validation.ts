@@ -71,9 +71,7 @@ export function validate(config: Record<string, unknown>) {
   const errors = validateSync(validated, { skipMissingProperties: false });
 
   if (errors.length > 0) {
-    throw new Error(
-      `Variáveis de ambiente inválidas:\n${errors.toString()}`,
-    );
+    throw new Error(`Variáveis de ambiente inválidas:\n${errors.toString()}`);
   }
 
   return validated;

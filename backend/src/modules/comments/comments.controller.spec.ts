@@ -51,7 +51,11 @@ describe('CommentsController', () => {
 
       const result = await controller.create(OCC_ID, jwtPayload, dto);
 
-      expect(commentsService.create).toHaveBeenCalledWith(OCC_ID, jwtPayload.sub, dto);
+      expect(commentsService.create).toHaveBeenCalledWith(
+        OCC_ID,
+        jwtPayload.sub,
+        dto,
+      );
       expect(result).toEqual(mockComment);
     });
   });
@@ -74,7 +78,10 @@ describe('CommentsController', () => {
     it('deve chamar commentsService.remove com id e userId', async () => {
       await controller.remove(COMMENT_ID, jwtPayload);
 
-      expect(commentsService.remove).toHaveBeenCalledWith(COMMENT_ID, jwtPayload.sub);
+      expect(commentsService.remove).toHaveBeenCalledWith(
+        COMMENT_ID,
+        jwtPayload.sub,
+      );
     });
   });
 });

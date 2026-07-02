@@ -1,0 +1,111 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  backend-ci:
+    name: Backend CI (Lint, Build, Test)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: infoagua_test
+          POSTGRES_DB: infoagua_test
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci --legacy-peer-deps
+
+      - name: Generate Prisma Client
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Run linter
+        working-directory: backend
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Build project
+        working-directory: backend
+        run: npm run build
+
+      - name: Initialize PostgreSQL database extensions
+        run: |
+          CONTAINER_ID=$(docker ps --filter "ancestor=postgres:16-alpine" --format "{{.ID}}")
+          docker exec -i $CONTAINER_ID psql -U infoagua_test -d infoagua_test < infra/postgres/init.sql
+
+      - name: Run database migrations
+        working-directory: backend
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://infoagua_test:postgres@localhost:5432/infoagua_test?schema=public
+
+      - name: Run unit tests
+        working-directory: backend
+        run: npm run test
+        env:
+          DATABASE_URL: postgresql://infoagua_test:postgres@localhost:5432/infoagua_test?schema=public
+          JWT_SECRET: test-jwt-secret-key-12345
+
+      - name: Run E2E tests
+        working-directory: backend
+        run: npm run test:e2e
+        env:
+          DATABASE_URL: postgresql://infoagua_test:postgres@localhost:5432/infoagua_test?schema=public
+          JWT_SECRET: test-jwt-secret-key-12345
+
+  mobile-ci:
+    name: Mobile CI (Lint, Typecheck)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: npm ci --legacy-peer-deps
+
+      - name: Run typecheck
+        working-directory: mobile
+        run: npx tsc --noEmit
+
+      - name: Run linter
+        working-directory: mobile
+        run: npm run lint

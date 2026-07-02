@@ -12,7 +12,10 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { OccurrenceType } from '@prisma/client';
 
 export class FilterOccurrencesDto {
-  @ApiPropertyOptional({ enum: OccurrenceType, description: 'Filtrar por tipo' })
+  @ApiPropertyOptional({
+    enum: OccurrenceType,
+    description: 'Filtrar por tipo',
+  })
   @IsOptional()
   @IsEnum(OccurrenceType)
   type?: OccurrenceType;
@@ -22,7 +25,9 @@ export class FilterOccurrencesDto {
   @IsString()
   city?: string;
 
-  @ApiPropertyOptional({ description: 'ID da última ocorrência retornada (cursor)' })
+  @ApiPropertyOptional({
+    description: 'ID da última ocorrência retornada (cursor)',
+  })
   @IsOptional()
   @IsUUID()
   cursor?: string;
