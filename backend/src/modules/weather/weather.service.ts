@@ -1,7 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
-import { ServiceUnavailableException } from '@nestjs/common';
 import { firstValueFrom } from 'rxjs';
 import { WeatherResponseDto } from './dto/weather-response.dto';
 
@@ -16,7 +20,7 @@ interface OWForecastItem {
     description: string;
     icon: string;
   }>;
-  pop: number;
+  pop: number; // probability of precipitation (0–1)
 }
 
 interface OWForecastResponse {
@@ -27,6 +31,7 @@ interface OWForecastResponse {
 
 @Injectable()
 export class WeatherService {
+  private readonly logger = new Logger(WeatherService.name);
   private readonly baseUrl = 'https://api.openweathermap.org/data/2.5/forecast';
 
   constructor(
@@ -34,8 +39,16 @@ export class WeatherService {
     private readonly config: ConfigService,
   ) {}
 
+  // ─── getForecast ─────────────────────────────────────────────────────────────
+
   async getForecast(lat: number, lon: number): Promise<WeatherResponseDto> {
     const apiKey = this.config.get<string>('openWeather.apiKey', '');
+
+    if (!apiKey) {
+      throw new InternalServerErrorException(
+        'OPENWEATHER_API_KEY não configurada.',
+      );
+    }
 
     const url =
       `${this.baseUrl}?lat=${lat}&lon=${lon}` +
@@ -48,9 +61,16 @@ export class WeatherService {
         this.http.get<OWForecastResponse>(url),
       );
       data = response.data;
-    } catch {
+    } catch (err) {
+      this.logger.error('Falha ao consultar OpenWeather API', err);
       throw new ServiceUnavailableException(
         'Serviço de previsão do tempo indisponível no momento.',
+      );
+    }
+
+    if (!data.list?.length) {
+      throw new ServiceUnavailableException(
+        'OpenWeather não retornou dados de previsão.',
       );
     }
 

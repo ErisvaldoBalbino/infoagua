@@ -1,7 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
-import { ServiceUnavailableException } from '@nestjs/common';
+import {
+  InternalServerErrorException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { of, throwError } from 'rxjs';
 import { AxiosResponse } from 'axios';
 import { WeatherService } from './weather.service';
@@ -34,12 +37,12 @@ const OW_FORECAST_STUB = {
 describe('WeatherService', () => {
   let service: WeatherService;
   let httpService: jest.Mocked<Pick<HttpService, 'get'>>;
+  let configGet: jest.Mock;
 
   beforeEach(async () => {
     const httpMock = { get: jest.fn() };
-    const configMock = {
-      get: jest.fn().mockReturnValue('fake-api-key'),
-    };
+    configGet = jest.fn().mockReturnValue('fake-api-key');
+    const configMock = { get: configGet };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -91,5 +94,28 @@ describe('WeatherService', () => {
     await expect(service.getForecast(-23.5, -46.6)).rejects.toThrow(
       ServiceUnavailableException,
     );
+  });
+
+  // ─── getForecast — lista vazia ────────────────────────────────────────────
+
+  it('getForecast — lança ServiceUnavailableException quando list está vazia', async () => {
+    httpService.get.mockReturnValue(
+      of(makeAxiosResponse({ list: [] })),
+    );
+
+    await expect(service.getForecast(-23.5, -46.6)).rejects.toThrow(
+      ServiceUnavailableException,
+    );
+  });
+
+  // ─── getForecast — apiKey ausente ─────────────────────────────────────────
+
+  it('getForecast — lança InternalServerErrorException quando OPENWEATHER_API_KEY não está configurada', async () => {
+    configGet.mockReturnValue('');
+
+    await expect(service.getForecast(-23.5, -46.6)).rejects.toThrow(
+      InternalServerErrorException,
+    );
+    expect(httpService.get).not.toHaveBeenCalled();
   });
 });
