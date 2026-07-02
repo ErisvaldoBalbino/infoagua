@@ -4,7 +4,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { CreateBucketCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { randomUUID } from 'crypto';
 import { extname } from 'path';
 import { fromBuffer } from 'file-type';
@@ -20,7 +20,7 @@ export class StorageService implements OnModuleInit {
 
   // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
-  onModuleInit() {
+  async onModuleInit() {
     const endpoint = this.config.get<string>('storage.endpoint', '');
     const accessKeyId = this.config.get<string>('storage.accessKey', '');
     const secretAccessKey = this.config.get<string>('storage.secretKey', '');
@@ -35,6 +35,27 @@ export class StorageService implements OnModuleInit {
       credentials: { accessKeyId, secretAccessKey },
       forcePathStyle: true, // Necessário para Garage / MinIO compatíveis com S3
     });
+
+    try {
+      await this.ensureBucketExists();
+    } catch (error: any) {
+      console.error(`[StorageService] Failed to initialize/create bucket: ${error.message}`);
+    }
+  }
+
+  private async ensureBucketExists() {
+    if (!this.bucket) return;
+    try {
+      await this.s3.send(new HeadBucketCommand({ Bucket: this.bucket }));
+    } catch (error: any) {
+      if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
+        console.log(`[StorageService] Bucket "${this.bucket}" does not exist. Creating...`);
+        await this.s3.send(new CreateBucketCommand({ Bucket: this.bucket }));
+        console.log(`[StorageService] Bucket "${this.bucket}" created successfully.`);
+      } else {
+        throw error;
+      }
+    }
   }
 
   // ─── Upload ─────────────────────────────────────────────────────────────────
