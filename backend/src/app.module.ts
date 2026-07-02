@@ -9,6 +9,7 @@ import { CommentsModule } from './modules/comments/comments.module';
 import { OccurrencesModule } from './modules/occurrences/occurrences.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { UsersModule } from './modules/users/users.module';
+import { WeatherModule } from './modules/weather/weather.module';
 
 @Module({
   imports: [
@@ -23,7 +24,7 @@ import { UsersModule } from './modules/users/users.module';
     OccurrencesModule,
     CommentsModule,
     StorageModule,
-    // WeatherModule
+    WeatherModule
   ],
   controllers: [AppController],
 })
