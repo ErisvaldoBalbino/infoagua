@@ -4,6 +4,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { S3Client } from '@aws-sdk/client-s3';
 import { StorageService } from './storage.service';
 
+// ─── Mock file-type (must be before any imports that use it) ─────────────────
+
+const mockFromBuffer = jest.fn();
+
+jest.mock('file-type', () => ({
+  fromBuffer: (...args: unknown[]) => mockFromBuffer(...args),
+}));
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const ENDPOINT = 'http://garage.example.com';
@@ -36,6 +44,9 @@ describe('StorageService', () => {
   beforeEach(async () => {
     s3SendMock = jest.fn().mockResolvedValue({});
 
+    // Default: buffer detected as JPEG image
+    mockFromBuffer.mockResolvedValue({ ext: 'jpg', mime: 'image/jpeg' });
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StorageService,
@@ -65,6 +76,7 @@ describe('StorageService', () => {
   });
 
   afterEach(() => jest.clearAllMocks());
+
 
   // ─── upload ──────────────────────────────────────────────────────────────────
 
@@ -96,8 +108,49 @@ describe('StorageService', () => {
       );
     });
 
-    it('deve lançar BadRequestException se o arquivo não for uma imagem válida', async () => {
-      const file = makeFile({ mimetype: 'application/pdf', originalname: 'doc.pdf' });
+    it('deve lançar BadRequestException se magic bytes não correspondem a imagem', async () => {
+      // Simula um PDF com Content-Type forjado para image/jpeg
+      mockFromBuffer.mockResolvedValue({ ext: 'pdf', mime: 'application/pdf' });
+      const file = makeFile({ mimetype: 'image/jpeg', originalname: 'malicious.jpg' });
+
+      await expect(service.upload(file)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(s3SendMock).not.toHaveBeenCalled();
+    });
+
+    it('deve lançar BadRequestException se fromBuffer não reconhece o formato', async () => {
+      // Simula buffer sem magic bytes conhecidos (arquivo corrompido / binário arbitrário)
+      mockFromBuffer.mockResolvedValue(undefined);
+      const file = makeFile();
+
+      await expect(service.upload(file)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(s3SendMock).not.toHaveBeenCalled();
+    });
+
+    it('deve aceitar SVG válido sem chamar fromBuffer', async () => {
+      const svgBuffer = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>');
+      const file = makeFile({
+        mimetype: 'image/svg+xml',
+        originalname: 'icon.svg',
+        buffer: svgBuffer,
+      });
+
+      await service.upload(file);
+
+      // SVG não usa magic-byte detection
+      expect(mockFromBuffer).not.toHaveBeenCalled();
+      expect(s3SendMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('deve lançar BadRequestException para SVG inválido (conteúdo não-SVG)', async () => {
+      const file = makeFile({
+        mimetype: 'image/svg+xml',
+        originalname: 'fake.svg',
+        buffer: Buffer.from('not an svg file'),
+      });
 
       await expect(service.upload(file)).rejects.toBeInstanceOf(
         BadRequestException,
