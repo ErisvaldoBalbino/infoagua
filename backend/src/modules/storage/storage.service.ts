@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { randomUUID } from 'crypto';
 import { extname } from 'path';
+import { fromBuffer } from 'file-type';
 import { UploadResponseDto } from './dto/upload-response.dto';
 
 @Injectable()
@@ -39,11 +40,7 @@ export class StorageService implements OnModuleInit {
   // ─── Upload ─────────────────────────────────────────────────────────────────
 
   async upload(file: Express.Multer.File): Promise<UploadResponseDto> {
-    if (!file.mimetype.startsWith('image/')) {
-      throw new BadRequestException(
-        'Apenas imagens são permitidas (image/*).',
-      );
-    }
+    await this.validateImageBuffer(file);
 
     const ext = extname(file.originalname).toLowerCase();
     const key = `${randomUUID()}${ext}`;
@@ -58,5 +55,26 @@ export class StorageService implements OnModuleInit {
     );
 
     return { url: `${this.publicEndpoint}/${this.bucket}/${key}` };
+  }
+
+  // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+  private async validateImageBuffer(file: Express.Multer.File): Promise<void> {
+    if (file.mimetype === 'image/svg+xml') {
+      const text = file.buffer.toString('utf8', 0, 256);
+      if (!text.includes('<svg') && !text.includes('<?xml')) {
+        throw new BadRequestException('Arquivo SVG inválido.');
+      }
+      return;
+    }
+
+    const detected = await fromBuffer(file.buffer);
+    const isImage = detected?.mime.startsWith('image/');
+
+    if (!isImage) {
+      throw new BadRequestException(
+        'Apenas imagens são permitidas (image/*). O conteúdo do arquivo não corresponde a uma imagem válida.',
+      );
+    }
   }
 }
