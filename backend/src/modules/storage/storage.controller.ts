@@ -28,7 +28,18 @@ export class StorageController {
   @Post('upload')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT')
-  @UseInterceptors(FileInterceptor('file', { storage: undefined })) // memoryStorage (buffer)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+      fileFilter(_req, file, cb) {
+        if (file.mimetype.startsWith('image/')) {
+          cb(null, true);
+        } else {
+          cb(new Error('Apenas imagens são permitidas (image/*).'), false);
+        }
+      },
+    }),
+  )
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -47,6 +58,7 @@ export class StorageController {
   @ApiResponse({ status: 201, type: UploadResponseDto })
   @ApiResponse({ status: 400, description: 'Arquivo não é uma imagem válida' })
   @ApiResponse({ status: 401, description: 'Token ausente ou inválido' })
+  @ApiResponse({ status: 413, description: 'Arquivo excede o limite de 5 MB' })
   upload(
     @UploadedFile() file: Express.Multer.File,
   ): Promise<UploadResponseDto> {
