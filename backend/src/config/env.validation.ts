@@ -44,6 +44,10 @@ class EnvironmentVariables {
 
   @IsOptional()
   @IsString()
+  STORAGE_PUBLIC_ENDPOINT: string = '';
+
+  @IsOptional()
+  @IsString()
   STORAGE_ACCESS_KEY: string = '';
 
   @IsOptional()

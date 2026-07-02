@@ -4,6 +4,18 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { S3Client } from '@aws-sdk/client-s3';
 import { StorageService } from './storage.service';
 
+// ─── Mock AWS SDK S3Client ───────────────────────────────────────────────────
+const s3SendMock = jest.fn().mockResolvedValue({});
+jest.mock('@aws-sdk/client-s3', () => {
+  const original = jest.requireActual('@aws-sdk/client-s3');
+  return {
+    ...original,
+    S3Client: jest.fn().mockImplementation(() => ({
+      send: (...args: any[]) => s3SendMock(...args),
+    })),
+  };
+});
+
 // ─── Mock file-type (must be before any imports that use it) ─────────────────
 
 const mockFromBuffer = jest.fn();
@@ -39,10 +51,9 @@ function makeFile(
 
 describe('StorageService', () => {
   let service: StorageService;
-  let s3SendMock: jest.Mock;
 
   beforeEach(async () => {
-    s3SendMock = jest.fn().mockResolvedValue({});
+    s3SendMock.mockReset().mockResolvedValue({});
 
     // Default: buffer detected as JPEG image
     mockFromBuffer.mockResolvedValue({ ext: 'jpg', mime: 'image/jpeg' });
@@ -69,10 +80,8 @@ describe('StorageService', () => {
     }).compile();
 
     service = module.get<StorageService>(StorageService);
-    service.onModuleInit(); // inicializa o S3Client
-
-    // Substitui o client real pelo mock após inicialização
-    (service as any).s3 = { send: s3SendMock } as unknown as S3Client;
+    await service.onModuleInit(); // inicializa o S3Client e resolve a Promise
+    s3SendMock.mockClear();
   });
 
   afterEach(() => jest.clearAllMocks());
@@ -105,6 +114,17 @@ describe('StorageService', () => {
 
       expect(result.url).toMatch(
         new RegExp(`^${ENDPOINT}/${BUCKET}/[0-9a-f-]{36}\\.jpg$`),
+      );
+    });
+
+    it('deve usar STORAGE_PUBLIC_ENDPOINT se configurado', async () => {
+      const file = makeFile();
+      (service as any).publicEndpoint = 'http://public-endpoint.com';
+
+      const result = await service.upload(file);
+
+      expect(result.url).toMatch(
+        new RegExp(`^http://public-endpoint.com/${BUCKET}/[0-9a-f-]{36}\\.jpg$`),
       );
     });
 
