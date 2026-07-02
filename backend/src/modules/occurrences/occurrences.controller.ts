@@ -28,12 +28,16 @@ import {
   OccurrenceResponseDto,
 } from './dto/occurrence-response.dto';
 import { UpdateOccurrenceDto } from './dto/update-occurrence.dto';
+import { LikesService, LikeToggleResult } from './likes.service';
 import { OccurrencesService } from './occurrences.service';
 
 @ApiTags('Occurrences')
 @Controller('occurrences')
 export class OccurrencesController {
-  constructor(private readonly occurrencesService: OccurrencesService) {}
+  constructor(
+    private readonly occurrencesService: OccurrencesService,
+    private readonly likesService: LikesService,
+  ) {}
 
   // ─── POST /occurrences ──────────────────────────────────────────────────────
 
@@ -115,5 +119,22 @@ export class OccurrencesController {
     @CurrentUser() user: JwtPayload,
   ): Promise<void> {
     return this.occurrencesService.remove(id, user.sub);
+  }
+
+  // ─── POST /occurrences/:id/like ─────────────────────────────────────────────
+
+  @Post(':id/like')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Toggle like em uma ocorrência (curtir / descurtir)' })
+  @ApiResponse({ status: 200, description: '{ liked: true } ou { liked: false }' })
+  @ApiResponse({ status: 401, description: 'Token ausente ou inválido' })
+  @ApiResponse({ status: 404, description: 'Ocorrência não encontrada' })
+  toggleLike(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<LikeToggleResult> {
+    return this.likesService.toggle(id, user.sub);
   }
 }

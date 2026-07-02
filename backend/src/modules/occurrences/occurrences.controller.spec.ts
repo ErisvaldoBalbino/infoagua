@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { OccurrenceType } from '@prisma/client';
+import { LikesService } from './likes.service';
 import { OccurrencesController } from './occurrences.controller';
 import { OccurrencesService } from './occurrences.service';
 
@@ -36,6 +37,7 @@ const mockMapPin = {
 describe('OccurrencesController', () => {
   let controller: OccurrencesController;
   let occurrencesService: jest.Mocked<OccurrencesService>;
+  let likesService: jest.Mocked<LikesService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -52,11 +54,18 @@ describe('OccurrencesController', () => {
             remove: jest.fn().mockResolvedValue(undefined),
           },
         },
+        {
+          provide: LikesService,
+          useValue: {
+            toggle: jest.fn().mockResolvedValue({ liked: true }),
+          },
+        },
       ],
     }).compile();
 
     controller = module.get<OccurrencesController>(OccurrencesController);
     occurrencesService = module.get(OccurrencesService);
+    likesService = module.get(LikesService);
   });
 
   afterEach(() => jest.clearAllMocks());
@@ -129,6 +138,17 @@ describe('OccurrencesController', () => {
       await controller.remove(OCC_ID, jwtPayload);
 
       expect(occurrencesService.remove).toHaveBeenCalledWith(OCC_ID, jwtPayload.sub);
+    });
+  });
+
+  // ─── POST /occurrences/:id/like ─────────────────────────────────────────────
+
+  describe('POST /occurrences/:id/like', () => {
+    it('deve chamar likesService.toggle com id e userId e retornar { liked }', async () => {
+      const result = await controller.toggleLike(OCC_ID, jwtPayload);
+
+      expect(likesService.toggle).toHaveBeenCalledWith(OCC_ID, jwtPayload.sub);
+      expect(result).toEqual({ liked: true });
     });
   });
 });
