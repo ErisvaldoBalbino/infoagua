@@ -5,6 +5,7 @@ import { PrismaModule } from './common/prisma/prisma.module';
 import configuration from './config/configuration';
 import { validate } from './config/env.validation';
 import { AuthModule } from './modules/auth/auth.module';
+import { CommentsModule } from './modules/comments/comments.module';
 import { OccurrencesModule } from './modules/occurrences/occurrences.module';
 import { UsersModule } from './modules/users/users.module';
 
@@ -19,7 +20,8 @@ import { UsersModule } from './modules/users/users.module';
     AuthModule,
     UsersModule,
     OccurrencesModule,
-    // CommentsModule, LikesModule, StorageModule, WeatherModule
+    CommentsModule,
+    // LikesModule, StorageModule, WeatherModule
   ],
   controllers: [AppController],
 })
