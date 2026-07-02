@@ -37,6 +37,26 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   OPENWEATHER_API_KEY: string = '';
+
+  @IsOptional()
+  @IsString()
+  STORAGE_ENDPOINT: string = '';
+
+  @IsOptional()
+  @IsString()
+  STORAGE_ACCESS_KEY: string = '';
+
+  @IsOptional()
+  @IsString()
+  STORAGE_SECRET_KEY: string = '';
+
+  @IsOptional()
+  @IsString()
+  STORAGE_BUCKET: string = '';
+
+  @IsOptional()
+  @IsString()
+  STORAGE_REGION: string = 'us-east-1';
 }
 
 export function validate(config: Record<string, unknown>) {

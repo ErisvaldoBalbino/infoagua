@@ -7,6 +7,7 @@ import { validate } from './config/env.validation';
 import { AuthModule } from './modules/auth/auth.module';
 import { CommentsModule } from './modules/comments/comments.module';
 import { OccurrencesModule } from './modules/occurrences/occurrences.module';
+import { StorageModule } from './modules/storage/storage.module';
 import { UsersModule } from './modules/users/users.module';
 
 @Module({
@@ -21,7 +22,8 @@ import { UsersModule } from './modules/users/users.module';
     UsersModule,
     OccurrencesModule,
     CommentsModule,
-    // LikesModule, StorageModule, WeatherModule
+    StorageModule,
+    // WeatherModule
   ],
   controllers: [AppController],
 })
