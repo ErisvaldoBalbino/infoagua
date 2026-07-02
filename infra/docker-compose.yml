@@ -53,6 +53,9 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-infoagua}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-infoagua}?schema=public
       STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_PUBLIC_ENDPOINT: http://localhost:9000
+      STORAGE_ACCESS_KEY: ${MINIO_ROOT_USER:-infoagua}
+      STORAGE_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
     ports:
       - "0.0.0.0:3000:3000"
     depends_on:

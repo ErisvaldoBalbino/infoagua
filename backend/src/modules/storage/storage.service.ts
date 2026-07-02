@@ -4,7 +4,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { CreateBucketCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { CreateBucketCommand, HeadBucketCommand, PutBucketPolicyCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { randomUUID } from 'crypto';
 import { extname } from 'path';
 import { fromBuffer } from 'file-type';
@@ -27,7 +27,7 @@ export class StorageService implements OnModuleInit {
     const region = this.config.get<string>('storage.region', 'us-east-1');
 
     this.bucket = this.config.get<string>('storage.bucket', '');
-    this.publicEndpoint = endpoint;
+    this.publicEndpoint = this.config.get<string>('storage.publicEndpoint', '') || endpoint;
 
     this.s3 = new S3Client({
       endpoint,
@@ -52,9 +52,37 @@ export class StorageService implements OnModuleInit {
         console.log(`[StorageService] Bucket "${this.bucket}" does not exist. Creating...`);
         await this.s3.send(new CreateBucketCommand({ Bucket: this.bucket }));
         console.log(`[StorageService] Bucket "${this.bucket}" created successfully.`);
+        await this.setBucketPublicPolicy();
       } else {
         throw error;
       }
+    }
+  }
+
+  private async setBucketPublicPolicy() {
+    const policy = {
+      Version: '2012-10-17',
+      Statement: [
+        {
+          Sid: 'PublicRead',
+          Effect: 'Allow',
+          Principal: '*',
+          Action: ['s3:GetObject'],
+          Resource: [`arn:aws:s3:::${this.bucket}/*`],
+        },
+      ],
+    };
+
+    try {
+      await this.s3.send(
+        new PutBucketPolicyCommand({
+          Bucket: this.bucket,
+          Policy: JSON.stringify(policy),
+        }),
+      );
+      console.log(`[StorageService] Public read policy applied to bucket "${this.bucket}".`);
+    } catch (error: any) {
+      console.error(`[StorageService] Failed to apply public policy to bucket "${this.bucket}": ${error.message}`);
     }
   }
 
