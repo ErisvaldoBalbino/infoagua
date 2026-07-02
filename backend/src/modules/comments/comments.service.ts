@@ -70,7 +70,9 @@ export class CommentsService {
         select: { id: true },
       });
       if (!exists) throw new NotFoundException('Comentário não encontrado.');
-      throw new ForbiddenException('Você não tem permissão para remover este comentário.');
+      throw new ForbiddenException(
+        'Você não tem permissão para remover este comentário.',
+      );
     }
   }
 }

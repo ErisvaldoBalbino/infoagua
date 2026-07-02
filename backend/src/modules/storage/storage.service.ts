@@ -1,10 +1,12 @@
-import {
-  BadRequestException,
-  Injectable,
-  OnModuleInit,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { CreateBucketCommand, HeadBucketCommand, PutBucketPolicyCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  CreateBucketCommand,
+  HeadBucketCommand,
+  PutBucketPolicyCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { randomUUID } from 'crypto';
 import { extname } from 'path';
 import { fromBuffer } from 'file-type';
@@ -27,7 +29,8 @@ export class StorageService implements OnModuleInit {
     const region = this.config.get<string>('storage.region', 'us-east-1');
 
     this.bucket = this.config.get<string>('storage.bucket', '');
-    this.publicEndpoint = this.config.get<string>('storage.publicEndpoint', '') || endpoint;
+    this.publicEndpoint =
+      this.config.get<string>('storage.publicEndpoint', '') || endpoint;
 
     this.s3 = new S3Client({
       endpoint,
@@ -39,7 +42,9 @@ export class StorageService implements OnModuleInit {
     try {
       await this.ensureBucketExists();
     } catch (error: any) {
-      console.error(`[StorageService] Failed to initialize/create bucket: ${error.message}`);
+      console.error(
+        `[StorageService] Failed to initialize/create bucket: ${error.message}`,
+      );
     }
   }
 
@@ -48,10 +53,17 @@ export class StorageService implements OnModuleInit {
     try {
       await this.s3.send(new HeadBucketCommand({ Bucket: this.bucket }));
     } catch (error: any) {
-      if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
-        console.log(`[StorageService] Bucket "${this.bucket}" does not exist. Creating...`);
+      if (
+        error.name === 'NotFound' ||
+        error.$metadata?.httpStatusCode === 404
+      ) {
+        console.log(
+          `[StorageService] Bucket "${this.bucket}" does not exist. Creating...`,
+        );
         await this.s3.send(new CreateBucketCommand({ Bucket: this.bucket }));
-        console.log(`[StorageService] Bucket "${this.bucket}" created successfully.`);
+        console.log(
+          `[StorageService] Bucket "${this.bucket}" created successfully.`,
+        );
         await this.setBucketPublicPolicy();
       } else {
         throw error;
@@ -80,9 +92,13 @@ export class StorageService implements OnModuleInit {
           Policy: JSON.stringify(policy),
         }),
       );
-      console.log(`[StorageService] Public read policy applied to bucket "${this.bucket}".`);
+      console.log(
+        `[StorageService] Public read policy applied to bucket "${this.bucket}".`,
+      );
     } catch (error: any) {
-      console.error(`[StorageService] Failed to apply public policy to bucket "${this.bucket}": ${error.message}`);
+      console.error(
+        `[StorageService] Failed to apply public policy to bucket "${this.bucket}": ${error.message}`,
+      );
     }
   }
 

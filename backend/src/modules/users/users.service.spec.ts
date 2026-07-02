@@ -71,7 +71,9 @@ describe('UsersService', () => {
       const updated = { ...mockFullUser, name: 'Novo Nome' };
       (prisma.user.update as jest.Mock).mockResolvedValue(updated);
 
-      const result = await service.updateMe(mockFullUser.id, { name: 'Novo Nome' });
+      const result = await service.updateMe(mockFullUser.id, {
+        name: 'Novo Nome',
+      });
 
       expect(prisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -92,4 +94,3 @@ describe('UsersService', () => {
     });
   });
 });
-

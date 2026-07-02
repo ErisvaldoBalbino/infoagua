@@ -20,7 +20,9 @@ describe('CurrentUser decorator', () => {
     const factory = jest
       .fn()
       .mockImplementation((_data, context: ExecutionContext) => {
-        const request = context.switchToHttp().getRequest<{ user: JwtPayload }>();
+        const request = context
+          .switchToHttp()
+          .getRequest<{ user: JwtPayload }>();
         return request.user;
       });
 

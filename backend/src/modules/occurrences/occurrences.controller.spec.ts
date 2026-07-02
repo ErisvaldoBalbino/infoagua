@@ -50,7 +50,10 @@ describe('OccurrencesController', () => {
             findAll: jest.fn().mockResolvedValue([mockOccurrence]),
             findForMap: jest.fn().mockResolvedValue([mockMapPin]),
             findById: jest.fn().mockResolvedValue(mockOccurrence),
-            update: jest.fn().mockResolvedValue({ ...mockOccurrence, description: 'Atualizado' }),
+            update: jest.fn().mockResolvedValue({
+              ...mockOccurrence,
+              description: 'Atualizado',
+            }),
             remove: jest.fn().mockResolvedValue(undefined),
           },
         },
@@ -74,11 +77,19 @@ describe('OccurrencesController', () => {
 
   describe('POST /occurrences', () => {
     it('deve chamar occurrencesService.create com userId e dto e retornar a ocorrência', async () => {
-      const dto = { type: OccurrenceType.shortage, latitude: -8, longitude: -34, city: 'Recife' };
+      const dto = {
+        type: OccurrenceType.shortage,
+        latitude: -8,
+        longitude: -34,
+        city: 'Recife',
+      };
 
-      const result = await controller.create(jwtPayload, dto as any);
+      const result = await controller.create(jwtPayload, dto);
 
-      expect(occurrencesService.create).toHaveBeenCalledWith(jwtPayload.sub, dto);
+      expect(occurrencesService.create).toHaveBeenCalledWith(
+        jwtPayload.sub,
+        dto,
+      );
       expect(result).toEqual(mockOccurrence);
     });
   });
@@ -89,7 +100,7 @@ describe('OccurrencesController', () => {
     it('deve chamar occurrencesService.findAll e retornar lista', async () => {
       const filter = { limit: 10 };
 
-      const result = await controller.findAll(filter as any);
+      const result = await controller.findAll(filter);
 
       expect(occurrencesService.findAll).toHaveBeenCalledWith(filter);
       expect(result).toHaveLength(1);
@@ -124,9 +135,13 @@ describe('OccurrencesController', () => {
     it('deve chamar occurrencesService.update com id, userId e dto', async () => {
       const dto = { description: 'Atualizado' };
 
-      const result = await controller.update(OCC_ID, jwtPayload, dto as any);
+      const result = await controller.update(OCC_ID, jwtPayload, dto);
 
-      expect(occurrencesService.update).toHaveBeenCalledWith(OCC_ID, jwtPayload.sub, dto);
+      expect(occurrencesService.update).toHaveBeenCalledWith(
+        OCC_ID,
+        jwtPayload.sub,
+        dto,
+      );
       expect(result.description).toBe('Atualizado');
     });
   });
@@ -137,7 +152,10 @@ describe('OccurrencesController', () => {
     it('deve chamar occurrencesService.remove com id e userId', async () => {
       await controller.remove(OCC_ID, jwtPayload);
 
-      expect(occurrencesService.remove).toHaveBeenCalledWith(OCC_ID, jwtPayload.sub);
+      expect(occurrencesService.remove).toHaveBeenCalledWith(
+        OCC_ID,
+        jwtPayload.sub,
+      );
     });
   });
 

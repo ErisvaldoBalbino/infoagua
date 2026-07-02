@@ -1,7 +1,4 @@
-import {
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { OccurrenceType } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -88,10 +85,12 @@ describe('OccurrencesService', () => {
         city: 'Recife',
       };
 
-      const result = await service.create(OWNER_ID, dto as any);
+      const result = await service.create(OWNER_ID, dto);
 
       expect(prisma.occurrence.create).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ userId: OWNER_ID }) }),
+        expect.objectContaining({
+          data: expect.objectContaining({ userId: OWNER_ID }),
+        }),
       );
       expect(result.likesCount).toBe(2);
       expect(result.commentsCount).toBe(5);
@@ -103,7 +102,9 @@ describe('OccurrencesService', () => {
 
   describe('findAll', () => {
     it('deve retornar lista paginada por cursor', async () => {
-      (prisma.occurrence.findMany as jest.Mock).mockResolvedValue([rawOccurrence]);
+      (prisma.occurrence.findMany as jest.Mock).mockResolvedValue([
+        rawOccurrence,
+      ]);
 
       const result = await service.findAll({ limit: 10 });
 
@@ -134,7 +135,9 @@ describe('OccurrencesService', () => {
       await service.findAll({ type: OccurrenceType.shortage });
 
       expect(prisma.occurrence.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: expect.objectContaining({ type: OccurrenceType.shortage }) }),
+        expect.objectContaining({
+          where: expect.objectContaining({ type: OccurrenceType.shortage }),
+        }),
       );
     });
 
@@ -145,7 +148,9 @@ describe('OccurrencesService', () => {
 
       expect(prisma.occurrence.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ city: { contains: 'Recife', mode: 'insensitive' } }),
+          where: expect.objectContaining({
+            city: { contains: 'Recife', mode: 'insensitive' },
+          }),
         }),
       );
     });
@@ -156,7 +161,12 @@ describe('OccurrencesService', () => {
   describe('findForMap', () => {
     it('deve retornar apenas id, latitude, longitude e type', async () => {
       const mapRows = [
-        { id: OCC_ID, latitude: '-8.0476', longitude: '-34.877', type: OccurrenceType.shortage },
+        {
+          id: OCC_ID,
+          latitude: '-8.0476',
+          longitude: '-34.877',
+          type: OccurrenceType.shortage,
+        },
       ];
       (prisma.occurrence.findMany as jest.Mock).mockResolvedValue(mapRows);
 
@@ -180,7 +190,9 @@ describe('OccurrencesService', () => {
 
   describe('findById', () => {
     it('deve retornar ocorrência com likesCount e commentsCount', async () => {
-      (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue(rawOccurrence);
+      (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue(
+        rawOccurrence,
+      );
 
       const result = await service.findById(OCC_ID);
 
@@ -205,34 +217,47 @@ describe('OccurrencesService', () => {
   describe('update', () => {
     it('deve atualizar a ocorrência do próprio usuário', async () => {
       // updateMany matches id+userId → count 1 → then findUnique for response
-      (prisma.occurrence.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+      (prisma.occurrence.updateMany as jest.Mock).mockResolvedValue({
+        count: 1,
+      });
       (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue({
         ...rawOccurrence,
         description: 'Atualizado',
       });
 
-      const result = await service.update(OCC_ID, OWNER_ID, { description: 'Atualizado' });
+      const result = await service.update(OCC_ID, OWNER_ID, {
+        description: 'Atualizado',
+      });
 
       expect(prisma.occurrence.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: OCC_ID, userId: OWNER_ID }, data: { description: 'Atualizado' } }),
+        expect.objectContaining({
+          where: { id: OCC_ID, userId: OWNER_ID },
+          data: { description: 'Atualizado' },
+        }),
       );
       expect(result).toBeDefined();
     });
 
     it('deve lançar NotFoundException se ocorrência não existe', async () => {
       // updateMany returns 0 (no record at all) → diagnostic findUnique also null
-      (prisma.occurrence.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+      (prisma.occurrence.updateMany as jest.Mock).mockResolvedValue({
+        count: 0,
+      });
       (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue(null);
 
-      await expect(service.update('nao-existe', OWNER_ID, {})).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        service.update('nao-existe', OWNER_ID, {}),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('deve lançar ForbiddenException se usuário não é o dono', async () => {
       // updateMany returns 0 (wrong userId) → diagnostic findUnique finds the record
-      (prisma.occurrence.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
-      (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue({ id: OCC_ID });
+      (prisma.occurrence.updateMany as jest.Mock).mockResolvedValue({
+        count: 0,
+      });
+      (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue({
+        id: OCC_ID,
+      });
 
       await expect(service.update(OCC_ID, OTHER_ID, {})).rejects.toBeInstanceOf(
         ForbiddenException,
@@ -244,25 +269,35 @@ describe('OccurrencesService', () => {
 
   describe('remove', () => {
     it('deve remover a ocorrência do próprio usuário', async () => {
-      (prisma.occurrence.deleteMany as jest.Mock).mockResolvedValue({ count: 1 });
+      (prisma.occurrence.deleteMany as jest.Mock).mockResolvedValue({
+        count: 1,
+      });
 
       await service.remove(OCC_ID, OWNER_ID);
 
-      expect(prisma.occurrence.deleteMany).toHaveBeenCalledWith({ where: { id: OCC_ID, userId: OWNER_ID } });
+      expect(prisma.occurrence.deleteMany).toHaveBeenCalledWith({
+        where: { id: OCC_ID, userId: OWNER_ID },
+      });
     });
 
     it('deve lançar NotFoundException se ocorrência não existe', async () => {
-      (prisma.occurrence.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
+      (prisma.occurrence.deleteMany as jest.Mock).mockResolvedValue({
+        count: 0,
+      });
       (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue(null);
 
-      await expect(service.remove('nao-existe', OWNER_ID)).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        service.remove('nao-existe', OWNER_ID),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('deve lançar ForbiddenException se usuário não é o dono', async () => {
-      (prisma.occurrence.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
-      (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue({ id: OCC_ID });
+      (prisma.occurrence.deleteMany as jest.Mock).mockResolvedValue({
+        count: 0,
+      });
+      (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue({
+        id: OCC_ID,
+      });
 
       await expect(service.remove(OCC_ID, OTHER_ID)).rejects.toBeInstanceOf(
         ForbiddenException,

@@ -86,7 +86,6 @@ describe('StorageService', () => {
 
   afterEach(() => jest.clearAllMocks());
 
-
   // ─── upload ──────────────────────────────────────────────────────────────────
 
   describe('upload', () => {
@@ -124,14 +123,19 @@ describe('StorageService', () => {
       const result = await service.upload(file);
 
       expect(result.url).toMatch(
-        new RegExp(`^http://public-endpoint.com/${BUCKET}/[0-9a-f-]{36}\\.jpg$`),
+        new RegExp(
+          `^http://public-endpoint.com/${BUCKET}/[0-9a-f-]{36}\\.jpg$`,
+        ),
       );
     });
 
     it('deve lançar BadRequestException se magic bytes não correspondem a imagem', async () => {
       // Simula um PDF com Content-Type forjado para image/jpeg
       mockFromBuffer.mockResolvedValue({ ext: 'pdf', mime: 'application/pdf' });
-      const file = makeFile({ mimetype: 'image/jpeg', originalname: 'malicious.jpg' });
+      const file = makeFile({
+        mimetype: 'image/jpeg',
+        originalname: 'malicious.jpg',
+      });
 
       await expect(service.upload(file)).rejects.toBeInstanceOf(
         BadRequestException,
@@ -151,7 +155,9 @@ describe('StorageService', () => {
     });
 
     it('deve aceitar SVG válido sem chamar fromBuffer', async () => {
-      const svgBuffer = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>');
+      const svgBuffer = Buffer.from(
+        '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
+      );
       const file = makeFile({
         mimetype: 'image/svg+xml',
         originalname: 'icon.svg',

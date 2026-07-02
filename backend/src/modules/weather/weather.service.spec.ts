@@ -53,15 +53,13 @@ describe('WeatherService', () => {
     }).compile();
 
     service = module.get<WeatherService>(WeatherService);
-    httpService = httpMock as any;
+    httpService = httpMock;
   });
 
   // ─── getForecast — sucesso ────────────────────────────────────────────────
 
   it('getForecast — retorna WeatherResponseDto com dados mapeados da OpenWeather', async () => {
-    httpService.get.mockReturnValue(
-      of(makeAxiosResponse(OW_FORECAST_STUB)),
-    );
+    httpService.get.mockReturnValue(of(makeAxiosResponse(OW_FORECAST_STUB)));
 
     const result = await service.getForecast(-23.5, -46.6);
 
@@ -99,9 +97,7 @@ describe('WeatherService', () => {
   // ─── getForecast — lista vazia ────────────────────────────────────────────
 
   it('getForecast — lança ServiceUnavailableException quando list está vazia', async () => {
-    httpService.get.mockReturnValue(
-      of(makeAxiosResponse({ list: [] })),
-    );
+    httpService.get.mockReturnValue(of(makeAxiosResponse({ list: [] })));
 
     await expect(service.getForecast(-23.5, -46.6)).rejects.toThrow(
       ServiceUnavailableException,

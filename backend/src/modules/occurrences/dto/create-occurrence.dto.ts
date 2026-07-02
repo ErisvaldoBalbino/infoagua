@@ -30,7 +30,11 @@ export class CreateOccurrenceDto {
   @IsLongitude()
   longitude!: number;
 
-  @ApiProperty({ example: 'Recife', description: 'Cidade da ocorrência', maxLength: 100 })
+  @ApiProperty({
+    example: 'Recife',
+    description: 'Cidade da ocorrência',
+    maxLength: 100,
+  })
   @IsString()
   @MinLength(2)
   @MaxLength(100)

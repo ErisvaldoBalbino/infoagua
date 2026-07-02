@@ -30,9 +30,7 @@ export class UsersController {
   @ApiOperation({ summary: 'Perfil público de um usuário' })
   @ApiResponse({ status: 200, type: PublicProfileDto })
   @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
-  findById(
-    @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<PublicProfileDto> {
+  findById(@Param('id', ParseUUIDPipe) id: string): Promise<PublicProfileDto> {
     return this.usersService.findById(id);
   }
 

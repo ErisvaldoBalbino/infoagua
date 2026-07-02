@@ -11,7 +11,10 @@ export class LikesService {
 
   // ─── Toggle ─────────────────────────────────────────────────────────────────
 
-  async toggle(occurrenceId: string, userId: string): Promise<LikeToggleResult> {
+  async toggle(
+    occurrenceId: string,
+    userId: string,
+  ): Promise<LikeToggleResult> {
     // Verify occurrence exists
     const occurrence = await this.prisma.occurrence.findUnique({
       where: { id: occurrenceId },
