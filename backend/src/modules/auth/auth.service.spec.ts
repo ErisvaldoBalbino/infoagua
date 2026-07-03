@@ -23,7 +23,6 @@ const mockUser = {
 describe('AuthService', () => {
   let service: AuthService;
   let prisma: jest.Mocked<PrismaService>;
-  let jwtService: jest.Mocked<JwtService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -50,7 +49,6 @@ describe('AuthService', () => {
 
     service = module.get<AuthService>(AuthService);
     prisma = module.get(PrismaService);
-    jwtService = module.get(JwtService);
   });
 
   afterEach(() => jest.clearAllMocks());

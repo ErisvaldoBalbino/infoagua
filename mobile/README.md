@@ -1,56 +1,49 @@
-# Welcome to your Expo app 👋
+# InfoÁgua Mobile 📱
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Este diretório contém a aplicação móvel do **InfoÁgua**, desenvolvida utilizando **React Native** e **Expo**.
 
-## Get started
+O aplicativo permite que cidadãos reportem a qualidade e a disponibilidade de água em suas regiões, visualizem alertas, comentem e acompanhem previsões do tempo locais.
 
-1. Install dependencies
+---
 
-   ```bash
-   npm install
-   ```
+## 🛠️ Pré-requisitos
 
-2. Start the app
+Para rodar e testar o aplicativo móvel, você precisará de:
+*   [Node.js](https://nodejs.org/) (versão LTS recomendada)
+*   Para testar no celular físico: Instale o aplicativo **Expo Go** (disponível na [Google Play Store](https://play.google.com/store/apps/details?id=host.exp.exponent) ou [Apple App Store](https://apps.apple.com/app/expo-go/id984021508)).
+*   Para testar no computador: Emulador Android configurado (via Android Studio) ou Simulador iOS (disponível apenas no macOS via Xcode).
 
-   ```bash
-   npx expo start
-   ```
+---
 
-In the output, you'll find options to open the app in a
+## ⚙️ Instalação e Inicialização
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
+### 1. Instalar as dependências
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### 2. Iniciar o servidor de desenvolvimento (Metro Bundler)
+```bash
+npm run start
+```
+ou usando o Expo CLI diretamente:
+```bash
+npx expo start
+```
 
-### Other setup steps
+---
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+## 📲 Como testar o aplicativo
 
-## Learn more
+Após rodar o comando de inicialização, o terminal exibirá um **QR Code** e algumas opções. Escolha a melhor forma de visualizar o app:
 
-To learn more about developing your project with Expo, look at the following resources:
+*   **No celular físico (Expo Go):** Abra a câmera do seu celular (iOS) ou o aplicativo Expo Go (Android) e escaneie o QR Code mostrado no terminal. Certifique-se de que o computador e o celular estejam conectados na **mesma rede Wi-Fi**.
+*   **No Emulador Android:** Com o emulador já aberto, pressione `a` no terminal onde o Metro Bundler está rodando.
+*   **No Simulador iOS:** Pressione `i` no terminal para iniciar o app no simulador da Apple.
+*   **No Navegador (Web):** Pressione `w` no terminal para abrir a versão experimental no navegador.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+---
 
-## Join the community
+## 📁 Estrutura de Pastas
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+**WIP**

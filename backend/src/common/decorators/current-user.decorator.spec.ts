@@ -1,5 +1,5 @@
 import { ExecutionContext } from '@nestjs/common';
-import { JwtPayload, CurrentUser } from './current-user.decorator';
+import { JwtPayload } from './current-user.decorator';
 
 describe('CurrentUser decorator', () => {
   const mockUser: JwtPayload = {
@@ -20,7 +20,9 @@ describe('CurrentUser decorator', () => {
     const factory = jest
       .fn()
       .mockImplementation((_data, context: ExecutionContext) => {
-        const request = context.switchToHttp().getRequest<{ user: JwtPayload }>();
+        const request = context
+          .switchToHttp()
+          .getRequest<{ user: JwtPayload }>();
         return request.user;
       });
 

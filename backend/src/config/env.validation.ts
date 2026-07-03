@@ -1,6 +1,7 @@
 import { plainToInstance } from 'class-transformer';
 import {
   IsEnum,
+  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
@@ -19,6 +20,7 @@ class EnvironmentVariables {
   DATABASE_URL: string;
 
   @IsString()
+  @IsNotEmpty()
   JWT_SECRET: string;
 
   @IsOptional()
@@ -37,6 +39,30 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   OPENWEATHER_API_KEY: string = '';
+
+  @IsOptional()
+  @IsString()
+  STORAGE_ENDPOINT: string = '';
+
+  @IsOptional()
+  @IsString()
+  STORAGE_PUBLIC_ENDPOINT: string = '';
+
+  @IsOptional()
+  @IsString()
+  STORAGE_ACCESS_KEY: string = '';
+
+  @IsOptional()
+  @IsString()
+  STORAGE_SECRET_KEY: string = '';
+
+  @IsOptional()
+  @IsString()
+  STORAGE_BUCKET: string = '';
+
+  @IsOptional()
+  @IsString()
+  STORAGE_REGION: string = 'us-east-1';
 }
 
 export function validate(config: Record<string, unknown>) {
@@ -47,9 +73,7 @@ export function validate(config: Record<string, unknown>) {
   const errors = validateSync(validated, { skipMissingProperties: false });
 
   if (errors.length > 0) {
-    throw new Error(
-      `Variáveis de ambiente inválidas:\n${errors.toString()}`,
-    );
+    throw new Error(`Variáveis de ambiente inválidas:\n${errors.toString()}`);
   }
 
   return validated;
