@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { CommentResponseDto } from './dto/comment-response.dto';
@@ -25,22 +26,21 @@ export class CommentsService {
     userId: string,
     dto: CreateCommentDto,
   ): Promise<CommentResponseDto> {
-    // Verify occurrence exists before creating the comment
-    const occurrence = await this.prisma.occurrence.findUnique({
-      where: { id: occurrenceId },
-      select: { id: true },
-    });
-
-    if (!occurrence) {
-      throw new NotFoundException('Ocorrência não encontrada.');
+    try {
+      const comment = await this.prisma.comment.create({
+        data: { content: dto.content, occurrenceId, userId },
+        select: COMMENT_SELECT,
+      });
+      return comment;
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2003'
+      ) {
+        throw new NotFoundException('Ocorrência não encontrada.');
+      }
+      throw error;
     }
-
-    const comment = await this.prisma.comment.create({
-      data: { content: dto.content, occurrenceId, userId },
-      select: COMMENT_SELECT,
-    });
-
-    return comment;
   }
 
   // ─── FindByOccurrence ────────────────────────────────────────────────────────

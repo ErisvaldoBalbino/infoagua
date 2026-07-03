@@ -26,9 +26,10 @@ COPY --chown=node:node --from=builder /app/prisma          ./prisma
 COPY --chown=node:node --from=builder /app/prisma.config.js ./prisma.config.js
 COPY --chown=node:node package.json                        ./package.json
 
-EXPOSE 3000
+ENV PORT=3000
+EXPOSE $PORT
 
 HEALTHCHECK --interval=20s --timeout=5s --retries=3 \
-  CMD wget -qO- http://localhost:3000/v1/health || exit 1
+  CMD wget -qO- http://localhost:$PORT/v1/health || exit 1
 
 CMD ["node", "dist/main"]

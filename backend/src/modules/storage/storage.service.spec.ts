@@ -1,7 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
-import { S3Client } from '@aws-sdk/client-s3';
 import { StorageService } from './storage.service';
 
 // ─── Mock AWS SDK S3Client ───────────────────────────────────────────────────
@@ -11,7 +10,7 @@ jest.mock('@aws-sdk/client-s3', () => {
   return {
     ...original,
     S3Client: jest.fn().mockImplementation(() => ({
-      send: (...args: any[]) => s3SendMock(...args),
+      send: (command: unknown) => s3SendMock(command),
     })),
   };
 });
@@ -117,10 +116,33 @@ describe('StorageService', () => {
     });
 
     it('deve usar STORAGE_PUBLIC_ENDPOINT se configurado', async () => {
-      const file = makeFile();
-      (service as any).publicEndpoint = 'http://public-endpoint.com';
+      const moduleRef = await Test.createTestingModule({
+        providers: [
+          StorageService,
+          {
+            provide: ConfigService,
+            useValue: {
+              get: (key: string, fallback = '') => {
+                const map: Record<string, string> = {
+                  'storage.endpoint': ENDPOINT,
+                  'storage.publicEndpoint': 'http://public-endpoint.com',
+                  'storage.accessKey': 'access-key',
+                  'storage.secretKey': 'secret-key',
+                  'storage.region': 'us-east-1',
+                  'storage.bucket': BUCKET,
+                };
+                return map[key] ?? fallback;
+              },
+            },
+          },
+        ],
+      }).compile();
 
-      const result = await service.upload(file);
+      const customService = moduleRef.get<StorageService>(StorageService);
+      await customService.onModuleInit();
+
+      const file = makeFile();
+      const result = await customService.upload(file);
 
       expect(result.url).toMatch(
         new RegExp(
@@ -154,28 +176,11 @@ describe('StorageService', () => {
       expect(s3SendMock).not.toHaveBeenCalled();
     });
 
-    it('deve aceitar SVG válido sem chamar fromBuffer', async () => {
-      const svgBuffer = Buffer.from(
-        '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
-      );
+    it('deve rejeitar uploads de SVG por segurança', async () => {
       const file = makeFile({
         mimetype: 'image/svg+xml',
         originalname: 'icon.svg',
-        buffer: svgBuffer,
-      });
-
-      await service.upload(file);
-
-      // SVG não usa magic-byte detection
-      expect(mockFromBuffer).not.toHaveBeenCalled();
-      expect(s3SendMock).toHaveBeenCalledTimes(1);
-    });
-
-    it('deve lançar BadRequestException para SVG inválido (conteúdo não-SVG)', async () => {
-      const file = makeFile({
-        mimetype: 'image/svg+xml',
-        originalname: 'fake.svg',
-        buffer: Buffer.from('not an svg file'),
+        buffer: Buffer.from('<svg></svg>'),
       });
 
       await expect(service.upload(file)).rejects.toBeInstanceOf(

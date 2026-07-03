@@ -29,10 +29,17 @@ interface OWForecastResponse {
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
+interface CacheEntry {
+  data: WeatherResponseDto;
+  expiresAt: number;
+}
+
 @Injectable()
 export class WeatherService {
   private readonly logger = new Logger(WeatherService.name);
   private readonly baseUrl = 'https://api.openweathermap.org/data/2.5/forecast';
+  private readonly cache = new Map<string, CacheEntry>();
+  private readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
 
   constructor(
     private readonly http: HttpService,
@@ -50,6 +57,16 @@ export class WeatherService {
       );
     }
 
+    const latKey = Number(lat).toFixed(3);
+    const lonKey = Number(lon).toFixed(3);
+    const cacheKey = `${latKey},${lonKey}`;
+
+    const now = Date.now();
+    const cached = this.cache.get(cacheKey);
+    if (cached && cached.expiresAt > now) {
+      return cached.data;
+    }
+
     const url =
       `${this.baseUrl}?lat=${lat}&lon=${lon}` +
       `&appid=${apiKey}&units=metric&cnt=1&lang=pt_br`;
@@ -62,7 +79,16 @@ export class WeatherService {
       );
       data = response.data;
     } catch (err) {
-      this.logger.error('Falha ao consultar OpenWeather API', err);
+      const axiosError = err as {
+        message?: string;
+        response?: { status?: number; data?: { message?: string } };
+      };
+      const message =
+        axiosError.response?.data?.message || axiosError.message || String(err);
+      const status = axiosError.response?.status;
+      this.logger.error(
+        `Falha ao consultar OpenWeather API: ${message}${status ? ` (Status: ${status})` : ''}`,
+      );
       throw new ServiceUnavailableException(
         'Serviço de previsão do tempo indisponível no momento.',
       );
@@ -76,12 +102,19 @@ export class WeatherService {
 
     const item = data.list[0];
 
-    return {
+    const result = {
       temperature: item.main.temp,
       description: item.weather[0]?.description ?? '',
       rainProbability: item.pop,
       icon: item.weather[0]?.icon ?? '',
       datetime: new Date(item.dt * 1000).toISOString(),
     };
+
+    this.cache.set(cacheKey, {
+      data: result,
+      expiresAt: now + this.CACHE_TTL_MS,
+    });
+
+    return result;
   }
 }

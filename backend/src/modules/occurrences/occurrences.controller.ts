@@ -23,6 +23,7 @@ import type { JwtPayload } from '../../common/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CreateOccurrenceDto } from './dto/create-occurrence.dto';
 import { FilterOccurrencesDto } from './dto/filter-occurrences.dto';
+import { FilterMapOccurrencesDto } from './dto/filter-map-occurrences.dto';
 import {
   OccurrenceMapPinDto,
   OccurrenceResponseDto,
@@ -69,10 +70,12 @@ export class OccurrencesController {
   // IMPORTANT: must be declared BEFORE :id to avoid route conflict
 
   @Get('map')
-  @ApiOperation({ summary: 'Pins do mapa: id, lat, lng, type' })
+  @ApiOperation({ summary: 'Pins do mapa: id, lat, lng, type com filtros' })
   @ApiResponse({ status: 200, type: [OccurrenceMapPinDto] })
-  findForMap(): Promise<OccurrenceMapPinDto[]> {
-    return this.occurrencesService.findForMap();
+  findForMap(
+    @Query() filter?: FilterMapOccurrencesDto,
+  ): Promise<OccurrenceMapPinDto[]> {
+    return this.occurrencesService.findForMap(filter ?? {});
   }
 
   // ─── GET /occurrences/:id ───────────────────────────────────────────────────

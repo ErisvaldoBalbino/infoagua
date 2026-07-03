@@ -1,5 +1,6 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CommentsService } from './comments.service';
 
@@ -54,18 +55,12 @@ describe('CommentsService', () => {
 
   describe('create', () => {
     it('deve criar comentário vinculado à ocorrência e ao usuário', async () => {
-      (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue({
-        id: OCC_ID,
-      });
       (prisma.comment.create as jest.Mock).mockResolvedValue(rawComment);
 
       const result = await service.create(OCC_ID, OWNER_ID, {
         content: 'Ótima ocorrência!',
       });
 
-      expect(prisma.occurrence.findUnique).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: OCC_ID } }),
-      );
       expect(prisma.comment.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -79,13 +74,18 @@ describe('CommentsService', () => {
     });
 
     it('deve lançar NotFoundException se ocorrência não existe', async () => {
-      (prisma.occurrence.findUnique as jest.Mock).mockResolvedValue(null);
+      const prismaError = new Prisma.PrismaClientKnownRequestError(
+        'Foreign key constraint failed',
+        {
+          code: 'P2003',
+          clientVersion: '7.8.0',
+        },
+      );
+      (prisma.comment.create as jest.Mock).mockRejectedValue(prismaError);
 
       await expect(
         service.create('nao-existe', OWNER_ID, { content: 'Comentário' }),
       ).rejects.toBeInstanceOf(NotFoundException);
-
-      expect(prisma.comment.create).not.toHaveBeenCalled();
     });
   });
 

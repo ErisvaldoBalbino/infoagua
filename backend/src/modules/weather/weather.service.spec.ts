@@ -114,4 +114,14 @@ describe('WeatherService', () => {
     );
     expect(httpService.get).not.toHaveBeenCalled();
   });
+
+  it('getForecast — deve retornar dados cacheados na segunda chamada consecutiva para coordenadas semelhantes', async () => {
+    httpService.get.mockReturnValue(of(makeAxiosResponse(OW_FORECAST_STUB)));
+
+    const result1 = await service.getForecast(-23.5123, -46.6123);
+    const result2 = await service.getForecast(-23.5124, -46.6124); // Diferença na 4ª casa decimal (arredonda para o mesmo valor)
+
+    expect(result1).toEqual(result2);
+    expect(httpService.get).toHaveBeenCalledTimes(1); // Apenas uma chamada HTTP
+  });
 });

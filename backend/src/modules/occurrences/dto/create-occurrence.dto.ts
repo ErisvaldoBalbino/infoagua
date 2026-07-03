@@ -42,6 +42,6 @@ export class CreateOccurrenceDto {
 
   @ApiPropertyOptional({ description: 'URL da foto' })
   @IsOptional()
-  @IsUrl()
+  @IsUrl({ require_tld: false })
   photoUrl?: string;
 }

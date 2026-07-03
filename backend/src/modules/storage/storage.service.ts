@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  OnModuleInit,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   CreateBucketCommand,
@@ -14,6 +19,7 @@ import { UploadResponseDto } from './dto/upload-response.dto';
 
 @Injectable()
 export class StorageService implements OnModuleInit {
+  private readonly logger = new Logger(StorageService.name);
   private s3: S3Client;
   private bucket: string;
   private publicEndpoint: string;
@@ -41,9 +47,12 @@ export class StorageService implements OnModuleInit {
 
     try {
       await this.ensureBucketExists();
-    } catch (error: any) {
-      console.error(
-        `[StorageService] Failed to initialize/create bucket: ${error.message}`,
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(
+        `Failed to initialize/create bucket: ${message}`,
+        stack,
       );
     }
   }
@@ -52,18 +61,18 @@ export class StorageService implements OnModuleInit {
     if (!this.bucket) return;
     try {
       await this.s3.send(new HeadBucketCommand({ Bucket: this.bucket }));
-    } catch (error: any) {
+    } catch (error) {
+      const s3Error = error as {
+        name?: string;
+        $metadata?: { httpStatusCode?: number };
+      };
       if (
-        error.name === 'NotFound' ||
-        error.$metadata?.httpStatusCode === 404
+        s3Error.name === 'NotFound' ||
+        s3Error.$metadata?.httpStatusCode === 404
       ) {
-        console.log(
-          `[StorageService] Bucket "${this.bucket}" does not exist. Creating...`,
-        );
+        this.logger.log(`Bucket "${this.bucket}" does not exist. Creating...`);
         await this.s3.send(new CreateBucketCommand({ Bucket: this.bucket }));
-        console.log(
-          `[StorageService] Bucket "${this.bucket}" created successfully.`,
-        );
+        this.logger.log(`Bucket "${this.bucket}" created successfully.`);
         await this.setBucketPublicPolicy();
       } else {
         throw error;
@@ -92,12 +101,13 @@ export class StorageService implements OnModuleInit {
           Policy: JSON.stringify(policy),
         }),
       );
-      console.log(
-        `[StorageService] Public read policy applied to bucket "${this.bucket}".`,
-      );
-    } catch (error: any) {
-      console.error(
-        `[StorageService] Failed to apply public policy to bucket "${this.bucket}": ${error.message}`,
+      this.logger.log(`Public read policy applied to bucket "${this.bucket}".`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(
+        `Failed to apply public policy to bucket "${this.bucket}": ${message}`,
+        stack,
       );
     }
   }
@@ -125,12 +135,11 @@ export class StorageService implements OnModuleInit {
   // ─── Helpers ─────────────────────────────────────────────────────────────────
 
   private async validateImageBuffer(file: Express.Multer.File): Promise<void> {
-    if (file.mimetype === 'image/svg+xml') {
-      const text = file.buffer.toString('utf8', 0, 256);
-      if (!text.includes('<svg') && !text.includes('<?xml')) {
-        throw new BadRequestException('Arquivo SVG inválido.');
-      }
-      return;
+    if (
+      file.mimetype === 'image/svg+xml' ||
+      file.originalname.toLowerCase().endsWith('.svg')
+    ) {
+      throw new BadRequestException('Arquivos SVG não são permitidos.');
     }
 
     const detected = await fromBuffer(file.buffer);

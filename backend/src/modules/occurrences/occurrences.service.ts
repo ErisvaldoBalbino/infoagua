@@ -7,6 +7,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateOccurrenceDto } from './dto/create-occurrence.dto';
 import { UpdateOccurrenceDto } from './dto/update-occurrence.dto';
 import { FilterOccurrencesDto } from './dto/filter-occurrences.dto';
+import { FilterMapOccurrencesDto } from './dto/filter-map-occurrences.dto';
 import {
   OccurrenceMapPinDto,
   OccurrenceResponseDto,
@@ -99,8 +100,29 @@ export class OccurrencesService {
 
   // ─── FindForMap ──────────────────────────────────────────────────────────────
 
-  async findForMap(): Promise<OccurrenceMapPinDto[]> {
+  async findForMap(
+    filter?: FilterMapOccurrencesDto,
+  ): Promise<OccurrenceMapPinDto[]> {
+    const { minLat, maxLat, minLng, maxLng, limit = 100 } = filter ?? {};
+
     const rows = await this.prisma.occurrence.findMany({
+      where: {
+        ...(minLat !== undefined && maxLat !== undefined
+          ? { latitude: { gte: minLat, lte: maxLat } }
+          : minLat !== undefined
+            ? { latitude: { gte: minLat } }
+            : maxLat !== undefined
+              ? { latitude: { lte: maxLat } }
+              : {}),
+        ...(minLng !== undefined && maxLng !== undefined
+          ? { longitude: { gte: minLng, lte: maxLng } }
+          : minLng !== undefined
+            ? { longitude: { gte: minLng } }
+            : maxLng !== undefined
+              ? { longitude: { lte: maxLng } }
+              : {}),
+      },
+      take: limit,
       select: { id: true, latitude: true, longitude: true, type: true },
     });
 
