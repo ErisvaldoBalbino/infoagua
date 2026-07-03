@@ -39,8 +39,6 @@ const mappedOccurrence = {
   commentsCount: 5,
 };
 
-const ownershipRow = { id: OCC_ID, userId: OWNER_ID };
-
 // ─── Suite ───────────────────────────────────────────────────────────────────
 
 describe('OccurrencesService', () => {

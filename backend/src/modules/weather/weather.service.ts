@@ -7,6 +7,7 @@ import {
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
+import { LRUCache } from 'lru-cache';
 import { WeatherResponseDto } from './dto/weather-response.dto';
 
 // ─── OpenWeather API types ────────────────────────────────────────────────────
@@ -29,17 +30,14 @@ interface OWForecastResponse {
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
-interface CacheEntry {
-  data: WeatherResponseDto;
-  expiresAt: number;
-}
-
 @Injectable()
 export class WeatherService {
   private readonly logger = new Logger(WeatherService.name);
   private readonly baseUrl = 'https://api.openweathermap.org/data/2.5/forecast';
-  private readonly cache = new Map<string, CacheEntry>();
-  private readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
+  private readonly cache = new LRUCache<string, WeatherResponseDto>({
+    max: 500,
+    ttl: 5 * 60 * 1000,
+  });
 
   constructor(
     private readonly http: HttpService,
@@ -61,10 +59,9 @@ export class WeatherService {
     const lonKey = Number(lon).toFixed(3);
     const cacheKey = `${latKey},${lonKey}`;
 
-    const now = Date.now();
     const cached = this.cache.get(cacheKey);
-    if (cached && cached.expiresAt > now) {
-      return cached.data;
+    if (cached) {
+      return cached;
     }
 
     const url =
@@ -110,10 +107,7 @@ export class WeatherService {
       datetime: new Date(item.dt * 1000).toISOString(),
     };
 
-    this.cache.set(cacheKey, {
-      data: result,
-      expiresAt: now + this.CACHE_TTL_MS,
-    });
+    this.cache.set(cacheKey, result);
 
     return result;
   }

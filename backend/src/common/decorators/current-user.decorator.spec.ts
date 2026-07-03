@@ -1,5 +1,5 @@
 import { ExecutionContext } from '@nestjs/common';
-import { JwtPayload, CurrentUser } from './current-user.decorator';
+import { JwtPayload } from './current-user.decorator';
 
 describe('CurrentUser decorator', () => {
   const mockUser: JwtPayload = {

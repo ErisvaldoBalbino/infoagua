@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { of, throwError } from 'rxjs';
 import { AxiosResponse } from 'axios';
+import { LRUCache } from 'lru-cache';
 import { WeatherService } from './weather.service';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -123,5 +124,24 @@ describe('WeatherService', () => {
 
     expect(result1).toEqual(result2);
     expect(httpService.get).toHaveBeenCalledTimes(1); // Apenas uma chamada HTTP
+  });
+
+  it('getForecast — deve expirar e evictar itens antigos quando ultrapassar max size', async () => {
+    const testCache = new LRUCache<string, any>({ max: 3, ttl: 5000 });
+    (service as any).cache = testCache;
+
+    httpService.get.mockReturnValue(of(makeAxiosResponse(OW_FORECAST_STUB)));
+
+    await service.getForecast(-23.1, -46.1);
+    await service.getForecast(-23.2, -46.2);
+    await service.getForecast(-23.3, -46.3);
+
+    expect(testCache.size).toBe(3);
+
+    // O quarto elemento deve evictar o primeiro (-23.100, -46.100)
+    await service.getForecast(-23.4, -46.4);
+    expect(testCache.size).toBe(3);
+    expect(testCache.has('-23.100,-46.100')).toBe(false);
+    expect(testCache.has('-23.200,-46.200')).toBe(true);
   });
 });

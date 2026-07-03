@@ -1,6 +1,7 @@
 import { plainToInstance } from 'class-transformer';
 import {
   IsEnum,
+  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
@@ -19,6 +20,7 @@ class EnvironmentVariables {
   DATABASE_URL: string;
 
   @IsString()
+  @IsNotEmpty()
   JWT_SECRET: string;
 
   @IsOptional()
