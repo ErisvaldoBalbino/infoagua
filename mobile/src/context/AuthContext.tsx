@@ -5,8 +5,8 @@ import React, {
   useEffect,
   useState,
 } from "react";
-import * as SecureStore from "expo-secure-store";
 import { TOKEN_KEY, onUnauthorized } from "../services/api/client";
+import { storage } from "../services/storage";
 import { authService, AuthUser, LoginPayload, RegisterPayload } from "../services/api/auth.service";
 
 interface AuthState {
@@ -41,14 +41,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     async function restoreSession() {
       try {
-        const savedToken = await SecureStore.getItemAsync(TOKEN_KEY);
+        const savedToken = await storage.getItem(TOKEN_KEY);
         if (savedToken) {
           setToken(savedToken);
           const me = await authService.me();
           setUser(me);
         }
       } catch {
-        await SecureStore.deleteItemAsync(TOKEN_KEY);
+        await storage.deleteItem(TOKEN_KEY);
       } finally {
         setIsLoading(false);
       }
@@ -58,20 +58,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (payload: LoginPayload) => {
     const { accessToken, user } = await authService.login(payload);
-    await SecureStore.setItemAsync(TOKEN_KEY, accessToken);
+    await storage.setItem(TOKEN_KEY, accessToken);
     setToken(accessToken);
     setUser(user);
   }, []);
 
   const register = useCallback(async (payload: RegisterPayload) => {
     const { accessToken, user } = await authService.register(payload);
-    await SecureStore.setItemAsync(TOKEN_KEY, accessToken);
+    await storage.setItem(TOKEN_KEY, accessToken);
     setToken(accessToken);
     setUser(user);
   }, []);
 
   const logout = useCallback(async () => {
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
+    await storage.deleteItem(TOKEN_KEY);
     setToken(null);
     setUser(null);
   }, []);
