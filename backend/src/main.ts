@@ -6,6 +6,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
@@ -32,7 +33,7 @@ async function bootstrap() {
   app.enableCors();
 
   // Logging de requisições HTTP
-  app.use((req, res, next) => {
+  app.use((req: Request, res: Response, next: NextFunction) => {
     const { method, originalUrl } = req;
     res.on('finish', () => {
       console.log(`[HTTP] ${method} ${originalUrl} - ${res.statusCode}`);
@@ -71,4 +72,4 @@ async function bootstrap() {
   console.log(`📚 Swagger disponível em http://localhost:${port}/api/docs`);
 }
 
-bootstrap();
+void bootstrap();
