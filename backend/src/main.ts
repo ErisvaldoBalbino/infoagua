@@ -31,6 +31,15 @@ async function bootstrap() {
   // CORS
   app.enableCors();
 
+  // Logging de requisições HTTP
+  app.use((req, res, next) => {
+    const { method, originalUrl } = req;
+    res.on('finish', () => {
+      console.log(`[HTTP] ${method} ${originalUrl} - ${res.statusCode}`);
+    });
+    next();
+  });
+
   // Versionamento URI global, todas as rotas ficam em /v1/
   app.enableVersioning({
     type: VersioningType.URI,
