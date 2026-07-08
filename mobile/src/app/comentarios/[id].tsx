@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   StyleSheet,
   Text,
@@ -10,18 +10,23 @@ import {
   RefreshControl,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Alert } from "../../utils/alert";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
 import { commentsService, CommentResponse } from "../../services/api/comments.service";
 import { Send, Trash2, MessageSquare, LogIn } from "lucide-react-native";
+import { CustomHeader } from "../../components/CustomHeader";
+import { Button } from "../../components/Button";
+import { ErrorState } from "../../components/ErrorState";
+import { theme } from "../../constants/theme";
 
 export default function CommentsScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const { isAuthenticated, user } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const [comments, setComments] = useState<CommentResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -30,7 +35,8 @@ export default function CommentsScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [hasError, setHasError] = useState(false);
-  
+
+
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -146,35 +152,34 @@ export default function CommentsScreen() {
     );
   };
 
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
-      <SafeAreaView style={styles.safeArea}>
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#208AEF" />
-          </View>
-        ) : hasError ? (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorEmoji}>⚠️</Text>
-            <Text style={styles.errorTitle}>Falha ao carregar comentários</Text>
-            <Text style={styles.errorText}>
-              Não foi possível carregar os comentários.
-            </Text>
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={() => {
-                setIsLoading(true);
-                setRefreshTrigger((prev) => prev + 1);
-              }}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.retryButtonText}>Tentar Novamente</Text>
-            </TouchableOpacity>
-          </View>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      <CustomHeader title="Comentários" />
+
+      <View style={styles.contentContainer}>
+        {hasError ? (
+          <ErrorState
+            title="Falha ao carregar comentários"
+            message="Não foi possível carregar os comentários."
+            onRetry={() => {
+              setIsLoading(true);
+              setRefreshTrigger((prev) => prev + 1);
+            }}
+          />
         ) : (
           <FlatList
             ref={flatListRef}
@@ -187,8 +192,8 @@ export default function CommentsScreen() {
               <RefreshControl
                 refreshing={isRefreshing}
                 onRefresh={handleRefresh}
-                colors={["#208AEF"]}
-                tintColor="#208AEF"
+                colors={[theme.colors.primary]}
+                tintColor={theme.colors.primary}
               />
             }
             ListEmptyComponent={
@@ -204,7 +209,7 @@ export default function CommentsScreen() {
         )}
 
         {/* Bottom Input Section */}
-        <View style={styles.bottomSection}>
+        <View style={[styles.bottomSection, { paddingBottom: Math.max(insets.bottom, 12) }]}>
           {isAuthenticated ? (
             <View style={styles.inputContainer}>
               <TextInput
@@ -237,18 +242,17 @@ export default function CommentsScreen() {
               <Text style={styles.restrictedText}>
                 Faça login para comentar nesta ocorrência.
               </Text>
-              <TouchableOpacity
-                style={styles.restrictedLoginButton}
+              <Button
+                title="Fazer Login"
                 onPress={() => router.push("/(auth)/login")}
-                activeOpacity={0.8}
-              >
-                <LogIn size={16} color="#FFFFFF" />
-                <Text style={styles.restrictedLoginButtonText}>Fazer Login</Text>
-              </TouchableOpacity>
+                variant="primary"
+                icon={<LogIn size={16} color="#FFFFFF" />}
+                style={{ height: 38, borderRadius: 20, paddingHorizontal: 14 }}
+              />
             </View>
           )}
         </View>
-      </SafeAreaView>
+      </View>
     </KeyboardAvoidingView>
   );
 }
@@ -256,15 +260,16 @@ export default function CommentsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: theme.colors.background,
   },
-  safeArea: {
+  contentContainer: {
     flex: 1,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: theme.colors.background,
   },
   listContent: {
     padding: 16,
@@ -272,7 +277,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   commentCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.colors.cardBackground,
     borderRadius: 16,
     padding: 14,
     ...Platform.select({
@@ -301,32 +306,35 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#E5E7EB",
+    backgroundColor: theme.colors.borderLight,
     justifyContent: "center",
     alignItems: "center",
   },
   avatarText: {
-    fontSize: 14,
+    fontSize: theme.typography.sizes.md,
     fontWeight: "bold",
-    color: "#4B5563",
+    fontFamily: theme.typography.fonts.bold,
+    color: theme.colors.text.secondary,
   },
   authorName: {
-    fontSize: 13,
+    fontSize: theme.typography.sizes.sm,
     fontWeight: "600",
-    color: "#1F2937",
+    fontFamily: theme.typography.fonts.semiBold,
+    color: theme.colors.text.primary,
   },
   dateText: {
     fontSize: 10,
-    color: "#9CA3AF",
+    color: theme.colors.text.tertiary,
   },
   deleteButton: {
     padding: 4,
   },
   commentContent: {
-    fontSize: 14,
-    color: "#4B5563",
+    fontSize: theme.typography.sizes.md,
+    color: theme.colors.text.secondary,
     lineHeight: 20,
     paddingLeft: 40,
+    fontFamily: theme.typography.fonts.regular,
   },
   emptyContainer: {
     flex: 1,
@@ -339,26 +347,28 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   emptyTitle: {
-    fontSize: 16,
+    fontSize: theme.typography.sizes.lg,
     fontWeight: "bold",
-    color: "#4B5563",
+    fontFamily: theme.typography.fonts.bold,
+    color: theme.colors.text.secondary,
     marginBottom: 6,
   },
   emptyText: {
-    fontSize: 13,
-    color: "#6B7280",
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.tertiary,
+    fontFamily: theme.typography.fonts.regular,
     textAlign: "center",
   },
   bottomSection: {
     padding: 12,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.colors.cardBackground,
     borderTopWidth: 1,
-    borderTopColor: "#E5E7EB",
+    borderTopColor: theme.colors.borderLight,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F3F4F6",
+    backgroundColor: theme.colors.borderLight,
     borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -366,8 +376,9 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: 14,
-    color: "#1F2937",
+    fontSize: theme.typography.sizes.md,
+    color: theme.colors.text.primary,
+    fontFamily: theme.typography.fonts.regular,
     maxHeight: 80,
     paddingTop: Platform.OS === "ios" ? 4 : 0,
     paddingBottom: Platform.OS === "ios" ? 4 : 0,
@@ -376,12 +387,12 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#208AEF",
+    backgroundColor: theme.colors.secondary,
     justifyContent: "center",
     alignItems: "center",
   },
   sendButtonDisabled: {
-    backgroundColor: "#9CA3AF",
+    backgroundColor: theme.colors.border,
   },
   restrictedContainer: {
     flexDirection: "row",
@@ -392,58 +403,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   restrictedText: {
-    fontSize: 13,
-    color: "#4B5563",
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.secondary,
+    fontFamily: theme.typography.fonts.regular,
     flex: 1,
-  },
-  restrictedLoginButton: {
-    flexDirection: "row",
-    backgroundColor: "#208AEF",
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    gap: 6,
-    alignItems: "center",
-  },
-  restrictedLoginButtonText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 32,
-    paddingVertical: 64,
-  },
-  errorEmoji: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  errorTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#EF4444",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  errorText: {
-    fontSize: 14,
-    color: "#6B7280",
-    textAlign: "center",
-    lineHeight: 20,
-    marginBottom: 24,
-  },
-  retryButton: {
-    backgroundColor: "#208AEF",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "600",
   },
 });

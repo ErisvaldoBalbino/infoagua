@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import { useState, useRef } from "react";
 import {
   ActivityIndicator,
-  Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -12,29 +12,16 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { Eye, EyeOff, Lock, Mail, User } from "lucide-react-native";
-import {
-  useFonts,
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-  Inter_800ExtraBold,
-} from "@expo-google-fonts/inter";
+import { Eye, EyeOff, Lock, Mail, User, AlertCircle } from "lucide-react-native";
+import { theme } from "../../constants/theme";
+import { LinearGradient } from "expo-linear-gradient";
+import Svg, { Path } from "react-native-svg";
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from "react-native-reanimated";
 import { useAuth } from "../../context/AuthContext";
 
 export default function RegisterScreen() {
   const router = useRouter();
   const { register } = useAuth();
-
-  const [fontsLoaded] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
-    Inter_800ExtraBold,
-  });
-
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -42,22 +29,74 @@ export default function RegisterScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isNameFocused, setIsNameFocused] = useState(false);
+  const [isEmailFocused, setIsEmailFocused] = useState(false);
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+  const [isConfirmFocused, setIsConfirmFocused] = useState(false);
+  const [nameError, setNameError] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [confirmPasswordError, setConfirmPasswordError] = useState("");
+  const [generalError, setGeneralError] = useState("");
+
+  const primaryButtonScale = useSharedValue(1);
+  const guestButtonScale = useSharedValue(1);
+
+  const primaryButtonScaleRef = useRef(primaryButtonScale);
+  const guestButtonScaleRef = useRef(guestButtonScale);
+
+  const animatedPrimaryButtonStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: primaryButtonScale.value }],
+  }));
+
+  const animatedGuestButtonStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: guestButtonScale.value }],
+  }));
 
   async function handleRegister() {
     if (isLoading) return;
 
-    if (!name.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
-      Alert.alert("Atenção", "Preencha todos os campos.");
-      return;
+    setNameError("");
+    setEmailError("");
+    setPasswordError("");
+    setConfirmPasswordError("");
+    setGeneralError("");
+
+    let hasError = false;
+
+    if (!name.trim()) {
+      setNameError("O nome é obrigatório.");
+      hasError = true;
     }
-    if (password !== confirmPassword) {
-      Alert.alert("Atenção", "As senhas não coincidem.");
-      return;
+
+    if (!email.trim()) {
+      setEmailError("O e-mail é obrigatório.");
+      hasError = true;
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        setEmailError("Por favor, digite um e-mail válido.");
+        hasError = true;
+      }
     }
-    if (password.length < 8) {
-      Alert.alert("Atenção", "A senha deve ter pelo menos 8 caracteres.");
-      return;
+
+    if (!password.trim()) {
+      setPasswordError("A senha é obrigatória.");
+      hasError = true;
+    } else if (password.length < 8) {
+      setPasswordError("A senha deve ter pelo menos 8 caracteres.");
+      hasError = true;
     }
+
+    if (!confirmPassword.trim()) {
+      setConfirmPasswordError("Por favor, confirme sua senha.");
+      hasError = true;
+    } else if (password !== confirmPassword) {
+      setConfirmPasswordError("As senhas não coincidem.");
+      hasError = true;
+    }
+
+    if (hasError) return;
 
     setIsLoading(true);
     try {
@@ -66,19 +105,16 @@ export default function RegisterScreen() {
     } catch (err: any) {
       const message =
         err?.response?.data?.message ?? "Não foi possível criar a conta. Tente novamente.";
-      Alert.alert("Erro ao cadastrar", message);
+      setGeneralError(message);
     } finally {
       setIsLoading(false);
     }
   }
 
-  if (!fontsLoaded) return null;
+
 
   return (
     <View style={styles.root}>
-      <View style={styles.bgTop} />
-      <View style={styles.bgBottom} />
-
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -88,61 +124,144 @@ export default function RegisterScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Card */}
-          <View style={styles.card}>
-            {/* Logo inside card */}
+          {/* Top Wavy Header */}
+          <LinearGradient
+            colors={["#1A3F6F", "#1A6FBB"]}
+            style={styles.headerGradient}
+          >
             <View style={styles.logoWrapper}>
-              <View style={styles.logoIcon}>
-                <Text style={styles.logoEmoji}>💧</Text>
-              </View>
+              <Image
+                source={require("@/assets/images/infoagua-logo.png")}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+              <Text style={styles.appName}>InfoÁgua</Text>
             </View>
+          </LinearGradient>
 
-            <Text style={styles.cardTitle}>Criar Conta</Text>
+          {/* SVG Wave Transition */}
+          <View style={styles.waveContainer}>
+            <Svg
+              height="60"
+              width="100%"
+              viewBox="0 0 1440 320"
+              preserveAspectRatio="none"
+              style={styles.waveSvg}
+            >
+              <Path
+                fill="#1A6FBB"
+                d="M0,96L120,112C240,128,480,160,720,160C960,160,1200,128,1320,112L1440,96L1440,0L1320,0C1200,0,960,0,720,0C480,0,240,0,120,0L0,0Z"
+              />
+            </Svg>
+          </View>
+
+          {/* Form Content Area */}
+          <View style={styles.formContainer}>
+            <Text style={styles.screenTitle}>Criar Conta</Text>
+            <Text style={styles.screenSubtitle}>Preencha os dados abaixo para começar</Text>
+
+            {!!generalError && (
+              <View style={styles.generalErrorContainer}>
+                <AlertCircle size={20} color={theme.colors.status.danger} style={styles.generalErrorIcon} />
+                <Text style={styles.generalErrorText}>{generalError}</Text>
+              </View>
+            )}
 
             {/* Nome */}
             <Text style={styles.label}>Nome</Text>
-            <View style={styles.inputWrapper}>
-              <User size={18} color="#9CA3AF" style={styles.inputIcon} />
+            <View style={[
+              styles.inputWrapper,
+              isNameFocused && styles.inputWrapperFocused,
+              !!nameError && styles.inputWrapperError,
+              !!nameError && { marginBottom: 6 }
+            ]}>
+              <User
+                size={18}
+                color={nameError ? theme.colors.status.danger : (isNameFocused ? "#208AEF" : "#9CA3AF")}
+                style={styles.inputIcon}
+              />
               <TextInput
                 style={styles.input}
                 placeholder="Ex: Maria Silva"
                 placeholderTextColor="#9CA3AF"
                 value={name}
-                onChangeText={setName}
+                onChangeText={(text) => {
+                  setName(text);
+                  if (nameError) setNameError("");
+                  if (generalError) setGeneralError("");
+                }}
                 autoCapitalize="words"
                 returnKeyType="next"
+                onFocus={() => setIsNameFocused(true)}
+                onBlur={() => setIsNameFocused(false)}
               />
             </View>
+            {!!nameError && (
+              <Text style={styles.errorText}>{nameError}</Text>
+            )}
 
             {/* E-mail */}
             <Text style={styles.label}>E-mail</Text>
-            <View style={styles.inputWrapper}>
-              <Mail size={18} color="#9CA3AF" style={styles.inputIcon} />
+            <View style={[
+              styles.inputWrapper,
+              isEmailFocused && styles.inputWrapperFocused,
+              !!emailError && styles.inputWrapperError,
+              !!emailError && { marginBottom: 6 }
+            ]}>
+              <Mail
+                size={18}
+                color={emailError ? theme.colors.status.danger : (isEmailFocused ? "#208AEF" : "#9CA3AF")}
+                style={styles.inputIcon}
+              />
               <TextInput
                 style={styles.input}
                 placeholder="seu@email.com.br"
                 placeholderTextColor="#9CA3AF"
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  if (emailError) setEmailError("");
+                  if (generalError) setGeneralError("");
+                }}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
                 returnKeyType="next"
+                onFocus={() => setIsEmailFocused(true)}
+                onBlur={() => setIsEmailFocused(false)}
               />
             </View>
+            {!!emailError && (
+              <Text style={styles.errorText}>{emailError}</Text>
+            )}
 
             {/* Senha */}
             <Text style={styles.label}>Senha</Text>
-            <View style={styles.inputWrapper}>
-              <Lock size={18} color="#9CA3AF" style={styles.inputIcon} />
+            <View style={[
+              styles.inputWrapper,
+              isPasswordFocused && styles.inputWrapperFocused,
+              !!passwordError && styles.inputWrapperError,
+              !!passwordError && { marginBottom: 6 }
+            ]}>
+              <Lock
+                size={18}
+                color={passwordError ? theme.colors.status.danger : (isPasswordFocused ? "#208AEF" : "#9CA3AF")}
+                style={styles.inputIcon}
+              />
               <TextInput
                 style={[styles.input, styles.inputPassword]}
-                placeholder="········"
+                placeholder="Ex: Pelo menos 8 caracteres"
                 placeholderTextColor="#9CA3AF"
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  if (passwordError) setPasswordError("");
+                  if (generalError) setGeneralError("");
+                }}
                 secureTextEntry={!showPassword}
                 returnKeyType="next"
+                onFocus={() => setIsPasswordFocused(true)}
+                onBlur={() => setIsPasswordFocused(false)}
               />
               <TouchableOpacity
                 onPress={() => setShowPassword((v) => !v)}
@@ -150,26 +269,44 @@ export default function RegisterScreen() {
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 {showPassword ? (
-                  <EyeOff size={18} color="#9CA3AF" />
+                  <EyeOff size={18} color={passwordError ? theme.colors.status.danger : (isPasswordFocused ? "#208AEF" : "#9CA3AF")} />
                 ) : (
-                  <Eye size={18} color="#9CA3AF" />
+                  <Eye size={18} color={passwordError ? theme.colors.status.danger : (isPasswordFocused ? "#208AEF" : "#9CA3AF")} />
                 )}
               </TouchableOpacity>
             </View>
+            {!!passwordError && (
+              <Text style={styles.errorText}>{passwordError}</Text>
+            )}
 
             {/* Confirmar Senha */}
             <Text style={styles.label}>Confirmar Senha</Text>
-            <View style={styles.inputWrapper}>
-              <Lock size={18} color="#9CA3AF" style={styles.inputIcon} />
+            <View style={[
+              styles.inputWrapper,
+              isConfirmFocused && styles.inputWrapperFocused,
+              !!confirmPasswordError && styles.inputWrapperError,
+              !!confirmPasswordError && { marginBottom: 6 }
+            ]}>
+              <Lock
+                size={18}
+                color={confirmPasswordError ? theme.colors.status.danger : (isConfirmFocused ? "#208AEF" : "#9CA3AF")}
+                style={styles.inputIcon}
+              />
               <TextInput
                 style={[styles.input, styles.inputPassword]}
-                placeholder="········"
+                placeholder="Confirme sua senha"
                 placeholderTextColor="#9CA3AF"
                 value={confirmPassword}
-                onChangeText={setConfirmPassword}
+                onChangeText={(text) => {
+                  setConfirmPassword(text);
+                  if (confirmPasswordError) setConfirmPasswordError("");
+                  if (generalError) setGeneralError("");
+                }}
                 secureTextEntry={!showConfirm}
                 returnKeyType="done"
                 onSubmitEditing={handleRegister}
+                onFocus={() => setIsConfirmFocused(true)}
+                onBlur={() => setIsConfirmFocused(false)}
               />
               <TouchableOpacity
                 onPress={() => setShowConfirm((v) => !v)}
@@ -177,26 +314,33 @@ export default function RegisterScreen() {
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 {showConfirm ? (
-                  <EyeOff size={18} color="#9CA3AF" />
+                  <EyeOff size={18} color={confirmPasswordError ? theme.colors.status.danger : (isConfirmFocused ? "#208AEF" : "#9CA3AF")} />
                 ) : (
-                  <Eye size={18} color="#9CA3AF" />
+                  <Eye size={18} color={confirmPasswordError ? theme.colors.status.danger : (isConfirmFocused ? "#208AEF" : "#9CA3AF")} />
                 )}
               </TouchableOpacity>
             </View>
+            {!!confirmPasswordError && (
+              <Text style={styles.errorText}>{confirmPasswordError}</Text>
+            )}
 
             {/* Botão cadastrar */}
-            <TouchableOpacity
-              style={[styles.primaryButton, isLoading && styles.primaryButtonDisabled]}
-              onPress={handleRegister}
-              disabled={isLoading}
-              activeOpacity={0.85}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.primaryButtonText}>Cadastrar →</Text>
-              )}
-            </TouchableOpacity>
+            <Animated.View style={animatedPrimaryButtonStyle}>
+              <TouchableOpacity
+                style={[styles.primaryButton, isLoading && styles.primaryButtonDisabled]}
+                onPress={handleRegister}
+                onPressIn={() => { primaryButtonScaleRef.current.value = withSpring(0.96); }}
+                onPressOut={() => { primaryButtonScaleRef.current.value = withSpring(1); }}
+                disabled={isLoading}
+                activeOpacity={0.85}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.primaryButtonText}>Cadastrar</Text>
+                )}
+              </TouchableOpacity>
+            </Animated.View>
 
             {/* Divisor */}
             <View style={styles.dividerWrapper}>
@@ -206,13 +350,17 @@ export default function RegisterScreen() {
             </View>
 
             {/* Botão visitante */}
-            <TouchableOpacity
-              style={styles.guestButton}
-              onPress={() => router.replace("/(tabs)")}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.guestButtonText}>Continuar como Visitante</Text>
-            </TouchableOpacity>
+            <Animated.View style={animatedGuestButtonStyle}>
+              <TouchableOpacity
+                style={styles.ghostButton}
+                onPress={() => router.replace("/(tabs)")}
+                onPressIn={() => { guestButtonScaleRef.current.value = withSpring(0.96); }}
+                onPressOut={() => { guestButtonScaleRef.current.value = withSpring(1); }}
+                activeOpacity={0.75}
+              >
+                <Text style={styles.ghostButtonText}>Entrar como visitante</Text>
+              </TouchableOpacity>
+            </Animated.View>
 
             {/* Rodapé */}
             <View style={styles.footer}>
@@ -228,118 +376,135 @@ export default function RegisterScreen() {
   );
 }
 
-const BLUE = "#1A6FBB";
-const BLUE_LIGHT = "#208AEF";
-
-const cardShadow = Platform.select({
-  web: { boxShadow: "0px 8px 20px rgba(0,0,0,0.10)" } as any,
-  default: {
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
-  },
-});
-
-const logoShadow = Platform.select({
-  web: { boxShadow: "0px 2px 8px rgba(0,0,0,0.08)" } as any,
-  default: {
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
-  },
-});
-
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#E8F1FA",
-  },
-  bgTop: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: "#E8F1FA",
-  },
-  bgBottom: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: "30%",
-    backgroundColor: "#D8E8F8",
+    backgroundColor: "#FFFFFF",
   },
   flex: { flex: 1 },
   scroll: {
     flexGrow: 1,
-    justifyContent: "center",
-    paddingHorizontal: 24,
-    paddingVertical: 48,
+    backgroundColor: "#FFFFFF",
   },
 
-  // Logo inside card
+  headerGradient: {
+    width: "100%",
+    paddingTop: Platform.OS === "ios" ? 70 : 50,
+    paddingBottom: 10,
+    alignItems: "center",
+  },
   logoWrapper: {
     alignItems: "center",
-    marginBottom: 8,
   },
-  logoIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
-    backgroundColor: "#EFF6FF",
-    justifyContent: "center",
-    alignItems: "center",
-    ...logoShadow,
+  logoImage: {
+    width: 80,
+    height: 80,
   },
-  logoEmoji: {
-    fontSize: 32,
+  appName: {
+    fontSize: 28,
+    fontFamily: theme.typography.fonts.bold,
+    color: "#FFFFFF",
+    marginTop: 10,
+    letterSpacing: 0.5,
   },
 
-  // Card
-  card: {
+  waveContainer: {
+    width: "100%",
+    height: 45,
     backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    paddingHorizontal: 24,
-    paddingVertical: 28,
-    ...cardShadow,
+    marginTop: -1,
   },
-  cardTitle: {
-    fontSize: 22,
-    fontFamily: "Inter_700Bold",
-    color: BLUE_LIGHT,
-    textAlign: "center",
-    marginBottom: 24,
-    marginTop: 12,
+  waveSvg: {
+    width: "100%",
+    height: "100%",
   },
 
-  // Labels & inputs
-  label: {
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
-    color: "#374151",
+  formContainer: {
+    flex: 1,
+    paddingHorizontal: 28,
+    paddingBottom: 40,
+    backgroundColor: "#FFFFFF",
+  },
+  screenTitle: {
+    fontSize: theme.typography.sizes.display,
+    fontFamily: theme.typography.fonts.bold,
+    color: theme.colors.text.primary,
+    textAlign: "left",
     marginBottom: 6,
+  },
+  screenSubtitle: {
+    fontSize: theme.typography.sizes.md,
+    fontFamily: theme.typography.fonts.regular,
+    color: theme.colors.text.secondary,
+    textAlign: "left",
+    marginBottom: 28,
+  },
+
+  label: {
+    fontSize: theme.typography.sizes.sm,
+    fontFamily: theme.typography.fonts.semiBold,
+    color: theme.colors.text.secondary,
+    marginBottom: 8,
   },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F3F4F6",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    paddingHorizontal: 12,
-    marginBottom: 16,
-    height: 50,
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius.button,
+    borderWidth: 1.5,
+    borderColor: theme.colors.borderLight,
+    paddingHorizontal: 16,
+    marginBottom: 20,
+    height: 54,
+  },
+  inputWrapperFocused: {
+    borderColor: theme.colors.secondary,
+    backgroundColor: theme.colors.cardBackground,
+  },
+  inputWrapperError: {
+    borderColor: theme.colors.status.danger,
+    backgroundColor: theme.colors.status.dangerBg,
+  },
+  errorText: {
+    color: theme.colors.status.danger,
+    fontSize: 12,
+    fontFamily: theme.typography.fonts.regular,
+    marginBottom: 14,
+    marginLeft: 4,
+  },
+  generalErrorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: theme.colors.status.dangerBg,
+    borderWidth: 1.5,
+    borderColor: theme.colors.status.danger,
+    borderRadius: theme.borderRadius.button,
+    padding: 14,
+    marginBottom: 20,
+  },
+  generalErrorIcon: {
+    marginRight: 10,
+  },
+  generalErrorText: {
+    flex: 1,
+    color: theme.colors.status.danger,
+    fontSize: 14,
+    fontFamily: theme.typography.fonts.semiBold,
   },
   inputIcon: {
-    marginRight: 10,
+    marginRight: 12,
   },
   input: {
     flex: 1,
     fontSize: 15,
-    fontFamily: "Inter_400Regular",
-    color: "#111827",
+    fontFamily: theme.typography.fonts.regular,
+    color: theme.colors.text.primary,
     height: "100%",
+    ...Platform.select({
+      web: {
+        outlineStyle: "none",
+      } as any,
+    }),
   },
   inputPassword: {
     paddingRight: 4,
@@ -348,72 +513,81 @@ const styles = StyleSheet.create({
     padding: 4,
   },
 
-  // Primary button
   primaryButton: {
-    backgroundColor: BLUE,
-    borderRadius: 50,
-    height: 52,
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.borderRadius.button,
+    height: 54,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 12,
+    marginTop: 10,
+    marginBottom: 24,
+    ...Platform.select({
+      web: { boxShadow: `0px 4px 12px ${theme.colors.primary}40` } as any,
+      default: {
+        shadowColor: theme.colors.primary,
+        shadowOpacity: 0.25,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 4,
+      },
+    }),
   },
   primaryButtonDisabled: {
     opacity: 0.7,
   },
   primaryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.3,
-  },
-  guestButton: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 50,
-    height: 52,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 20,
-    backgroundColor: "#FFFFFF",
-  },
-  guestButtonText: {
-    color: "#4B5563",
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
+    color: theme.colors.text.light,
+    fontSize: theme.typography.sizes.lg,
+    fontFamily: theme.typography.fonts.bold,
+    letterSpacing: 0.5,
   },
 
-  // Divider
   dividerWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 24,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: "#E5E7EB",
+    backgroundColor: theme.colors.borderLight,
   },
   dividerText: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: "#9CA3AF",
-    marginHorizontal: 12,
+    fontSize: theme.typography.sizes.sm,
+    fontFamily: theme.typography.fonts.regular,
+    color: theme.colors.text.tertiary,
+    marginHorizontal: 16,
   },
 
-  // Footer
+  ghostButton: {
+    backgroundColor: theme.colors.lightBg,
+    borderRadius: theme.borderRadius.button,
+    height: 54,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  ghostButtonText: {
+    color: theme.colors.secondary,
+    fontSize: 15,
+    fontFamily: theme.typography.fonts.semiBold,
+    letterSpacing: 0.2,
+  },
+
   footer: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
+    marginTop: 10,
   },
   footerText: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: "#6B7280",
+    fontSize: theme.typography.sizes.md,
+    fontFamily: theme.typography.fonts.regular,
+    color: theme.colors.text.secondary,
   },
   footerLink: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    color: BLUE_LIGHT,
+    fontSize: theme.typography.sizes.md,
+    fontFamily: theme.typography.fonts.semiBold,
+    color: theme.colors.secondary,
   },
 });

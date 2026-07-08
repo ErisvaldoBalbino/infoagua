@@ -1,33 +1,223 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   StyleSheet,
   Text,
   View,
-  TouchableOpacity,
   ActivityIndicator,
   ScrollView,
   Platform,
-  Alert,
   Image,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Alert } from "../../utils/alert";
+import { useLocalSearchParams, useRouter, Stack } from "expo-router";
+
 import { useAuth } from "../../context/AuthContext";
 import { occurrencesService, OccurrenceResponse } from "../../services/api/occurrences.service";
-import { MapPin, User, MessageSquare, ThumbsUp, ChevronRight } from "lucide-react-native";
+import {
+  MapPin,
+  MessageSquare,
+  ThumbsUp,
+  Map,
+  AlertTriangle,
+} from "lucide-react-native";
+import { ErrorState } from "../../components/ErrorState";
+import { CustomHeader } from "../../components/CustomHeader";
+import { ActionButton } from "../../components/ActionButton";
+import { theme } from "../../constants/theme";
+import {
+  typeBadgeBgs,
+  typeColors,
+  typeLabels,
+  typeIcons,
+  formatTimeAgo,
+} from "../../utils/occurrence-utils";
 
-const typeLabels: Record<string, string> = {
-  shortage: "Falta de Água",
-  return: "Abastecimento Retornado",
-  quality: "Qualidade da Água",
-  leak: "Vazamento",
-};
+let WebLocationMap: any = null;
+if (Platform.OS === "web") {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  WebLocationMap = require("@/components/WebMapView").WebLocationMap;
+}
 
-const typeColors: Record<string, string> = {
-  shortage: "#EF4444",
-  return: "#10B981",
-  quality: "#F59E0B",
-  leak: "#3B82F6",
-};
+let MapView: any;
+let Marker: any;
+let PROVIDER_GOOGLE: any;
+
+if (Platform.OS !== "web") {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Maps = require("react-native-maps");
+    MapView = Maps.default;
+    Marker = Maps.Marker;
+    PROVIDER_GOOGLE = Maps.PROVIDER_GOOGLE;
+  } catch (e) {
+    console.warn("Failed to load react-native-maps. Running in Web fallback mode.", e);
+  }
+}
+
+interface AddressData {
+  address: string;
+  details: string;
+  city: string;
+  lat: number;
+  lng: number;
+}
+
+const mockAddresses: AddressData[] = [
+  {
+    address: "Av. Boa Viagem, 1234",
+    details: "Boa Viagem, Recife - PE",
+    city: "Recife",
+    lat: -8.1156,
+    lng: -34.8924,
+  },
+  {
+    address: "Rua do Hospício, 200",
+    details: "Boa Vista, Recife - PE",
+    city: "Recife",
+    lat: -8.0585,
+    lng: -34.8845,
+  },
+  {
+    address: "Rua da Moeda, 50",
+    details: "Bairro do Recife, Recife - PE",
+    city: "Recife",
+    lat: -8.0632,
+    lng: -34.8711,
+  },
+  {
+    address: "Av. Agamenon Magalhães, 2990",
+    details: "Espinheiro, Recife - PE",
+    city: "Recife",
+    lat: -8.0495,
+    lng: -34.8961,
+  },
+  {
+    address: "Rua Amélia, 450",
+    details: "Graças, Recife - PE",
+    city: "Recife",
+    lat: -8.0425,
+    lng: -34.9015,
+  },
+  {
+    address: "Estrada do Encanamento, 800",
+    details: "Casa Forte, Recife - PE",
+    city: "Recife",
+    lat: -8.0315,
+    lng: -34.9180,
+  },
+];
+
+// Constants and date helpers are now managed by utils/occurrence-utils.
+
+function getAddressFromCoordinates(lat: number, lng: number, city: string) {
+  const threshold = 0.01;
+  const closest = mockAddresses.find(
+    (addr) =>
+      Math.abs(addr.lat - lat) < threshold &&
+      Math.abs(addr.lng - lng) < threshold
+  );
+
+  if (closest) {
+    return {
+      address: closest.address,
+      details: closest.details,
+    };
+  }
+
+  return {
+    address: `Ponto próximo a lat/lng: ${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+    details: `${city}`,
+  };
+}
+
+const mapStyle = [
+  {
+    elementType: "geometry",
+    stylers: [{ color: "#f1f5f9" }],
+  },
+  {
+    elementType: "labels.icon",
+    stylers: [{ visibility: "on" }, { opacity: 0.35 }],
+  },
+  {
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#64748b" }],
+  },
+  {
+    elementType: "labels.text.stroke",
+    stylers: [{ color: "#f1f5f9" }],
+  },
+  {
+    featureType: "administrative.land_parcel",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#bdbdbd" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "geometry",
+    stylers: [{ color: "#eeeeee" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#757575" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "geometry",
+    stylers: [{ color: "#e2e8f0" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#9e9e9e" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry",
+    stylers: [{ color: "#ffffff" }],
+  },
+  {
+    featureType: "road.arterial",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#757575" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "geometry",
+    stylers: [{ color: "#dadada" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#616161" }],
+  },
+  {
+    featureType: "road.local",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#9e9e9e" }],
+  },
+  {
+    featureType: "transit.line",
+    elementType: "geometry",
+    stylers: [{ color: "#e5e5e5" }],
+  },
+  {
+    featureType: "transit.station",
+    elementType: "geometry",
+    stylers: [{ color: "#eeeeee" }],
+  },
+  {
+    featureType: "water",
+    elementType: "geometry",
+    stylers: [{ color: "#c9e2ff" }],
+  },
+  {
+    featureType: "water",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#9e9e9e" }],
+  },
+];
 
 export default function DetailsScreen() {
   const router = useRouter();
@@ -41,6 +231,8 @@ export default function DetailsScreen() {
   const [hasError, setHasError] = useState(false);
   const [retryTrigger, setRetryTrigger] = useState(0);
   const [isLiking, setIsLiking] = useState(false);
+
+
 
   useEffect(() => {
     async function loadDetails() {
@@ -78,7 +270,6 @@ export default function DetailsScreen() {
     }
 
     if (!occurrence) return;
-
     if (isLiking) return;
 
     const newHasLiked = !hasLiked;
@@ -102,29 +293,24 @@ export default function DetailsScreen() {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#208AEF" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
 
   if (hasError) {
     return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorEmoji}>⚠️</Text>
-        <Text style={styles.errorTitle}>Falha ao carregar detalhes</Text>
-        <Text style={styles.errorText}>
-          Não foi possível carregar os detalhes do relato.
-        </Text>
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={() => {
+      <View style={styles.container}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <CustomHeader title="Detalhes" />
+        <ErrorState
+          title="Falha ao carregar detalhes"
+          message="Não foi possível carregar os detalhes do relato."
+          onRetry={() => {
             setIsLoading(true);
             setRetryTrigger((prev) => prev + 1);
           }}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.retryButtonText}>Tentar Novamente</Text>
-        </TouchableOpacity>
+        />
       </View>
     );
   }
@@ -132,299 +318,342 @@ export default function DetailsScreen() {
   if (!occurrence) {
     return (
       <View style={styles.container}>
-        <Text style={styles.errorText}>Ocorrência não encontrada.</Text>
+        <Stack.Screen options={{ headerShown: false }} />
+        <CustomHeader title="Detalhes" />
+        <View style={styles.notFoundContainer}>
+          <Text style={styles.errorText}>Ocorrência não encontrada.</Text>
+        </View>
       </View>
     );
   }
 
-  const formattedDate = new Date(occurrence.createdAt).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
+  const badgeBg = typeBadgeBgs[occurrence.type] || "#F3F4F6";
   const badgeColor = typeColors[occurrence.type] || "#6B7280";
   const badgeLabel = typeLabels[occurrence.type] || occurrence.type;
+  const IconComponent = typeIcons[occurrence.type] || AlertTriangle;
+
+  const addressInfo = getAddressFromCoordinates(
+    Number(occurrence.latitude),
+    Number(occurrence.longitude),
+    occurrence.city
+  );
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      <View style={styles.card}>
-        {/* Header: Author and Badge */}
-        <View style={styles.header}>
-          <View style={styles.authorBadge}>
-            <View style={styles.authorAvatar}>
-              <User size={24} color="#4B5563" />
-            </View>
-            <View>
-              <Text style={styles.authorName}>{occurrence.user.name}</Text>
-              <Text style={styles.dateText}>{formattedDate}</Text>
+    <View style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      <CustomHeader title="Detalhes" />
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Category and Time Row */}
+        <View style={styles.categoryTimeRow}>
+          <View style={styles.badgeContainer}>
+            <IconComponent size={18} color={badgeColor} style={styles.badgeIcon} />
+            <View style={[styles.badgePill, { backgroundColor: badgeBg }]}>
+              <Text style={[styles.badgeText, { color: badgeColor }]}>
+                {badgeLabel.toUpperCase()}
+              </Text>
             </View>
           </View>
-          <View style={[styles.typeBadge, { backgroundColor: badgeColor + "15" }]}>
-            <Text style={[styles.typeBadgeText, { color: badgeColor }]}>{badgeLabel}</Text>
+          <Text style={styles.timeAgoText}>{formatTimeAgo(occurrence.createdAt)}</Text>
+        </View>
+
+        {/* Map Card */}
+        <View style={styles.mapCard}>
+          {Platform.OS === "web" ? (
+            <View style={styles.map}>
+              {WebLocationMap && (
+                <WebLocationMap
+                  lat={Number(occurrence.latitude)}
+                  lng={Number(occurrence.longitude)}
+                />
+              )}
+            </View>
+          ) : !MapView ? (
+            <View style={styles.map} />
+          ) : (
+            <MapView
+              provider={PROVIDER_GOOGLE}
+              style={styles.map}
+              initialRegion={{
+                latitude: Number(occurrence.latitude),
+                longitude: Number(occurrence.longitude),
+                latitudeDelta: 0.005,
+                longitudeDelta: 0.005,
+              }}
+              customMapStyle={mapStyle}
+              scrollEnabled={false}
+              zoomEnabled={false}
+              pitchEnabled={false}
+              rotateEnabled={false}
+            >
+              <Marker
+                coordinate={{
+                  latitude: Number(occurrence.latitude),
+                  longitude: Number(occurrence.longitude),
+                }}
+              >
+                <View style={styles.markerWrapper}>
+                  <MapPin size={32} color="#0056C6" fill="#0056C6" />
+                </View>
+              </Marker>
+            </MapView>
+          )}
+
+          {/* Address Information */}
+          <View style={styles.addressSection}>
+            <View style={styles.addressIconContainer}>
+              <Map size={20} color="#0056C6" />
+            </View>
+            <View style={styles.addressTextContainer}>
+              <Text style={styles.addressTitle} numberOfLines={1}>
+                {addressInfo.address}
+              </Text>
+              <Text style={styles.addressSubtitle} numberOfLines={1}>
+                {addressInfo.details}
+              </Text>
+            </View>
           </View>
         </View>
 
-        {/* Location */}
-        <View style={styles.locationContainer}>
-          <MapPin size={18} color="#208AEF" />
-          <Text style={styles.locationText}>{occurrence.city}</Text>
-          <Text style={styles.coordinatesText}>
-            ({occurrence.latitude.toFixed(4)}, {occurrence.longitude.toFixed(4)})
-          </Text>
+        {/* Description Section */}
+        <View style={styles.sectionHeaderContainer}>
+          <Text style={styles.sectionHeader}>DESCRIÇÃO</Text>
         </View>
-
-        {/* Image (Optional) */}
-        {occurrence.photoUrl && (
-          <Image
-            source={{ uri: occurrence.photoUrl }}
-            style={styles.image}
-            resizeMode="cover"
-          />
-        )}
-
-        {/* Description */}
-        <View style={styles.descriptionSection}>
-          <Text style={styles.descriptionTitle}>Descrição do Relato</Text>
+        <View style={styles.descriptionBox}>
           <Text style={styles.descriptionText}>
             {occurrence.description || "Nenhuma descrição detalhada fornecida."}
           </Text>
         </View>
 
-        {/* Interactive Stats Info */}
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <ThumbsUp size={16} color="#6B7280" />
-            <Text style={styles.statLabel}>{likesCount} curtidas</Text>
+        {/* Evidence Section (Conditional) */}
+        {occurrence.photoUrl ? (
+          <View style={styles.evidenceSection}>
+            <View style={styles.sectionHeaderContainer}>
+              <Text style={styles.sectionHeader}>EVIDÊNCIAS</Text>
+            </View>
+            <Image
+              source={{ uri: occurrence.photoUrl }}
+              style={styles.evidenceImage}
+              resizeMode="cover"
+            />
           </View>
-          <View style={styles.statItem}>
-            <MessageSquare size={16} color="#6B7280" />
-            <Text style={styles.statLabel}>{occurrence.commentsCount} comentários</Text>
-          </View>
-        </View>
+        ) : null}
 
-        {/* Actions Button */}
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            style={[styles.actionButton, hasLiked && styles.actionButtonActive]}
+        <View style={styles.actionsRow}>
+          <ActionButton
+            icon={<ThumbsUp size={20} color={hasLiked ? "#0056C6" : "#475569"} fill={hasLiked ? "#E2E8F0" : "none"} />}
+            count={likesCount}
+            label={likesCount === 1 ? "Confirmação" : "Confirmações"}
             onPress={handleLike}
-            activeOpacity={0.8}
             disabled={isLiking}
-          >
-            <ThumbsUp size={20} color={hasLiked ? "#FFFFFF" : "#4B5563"} />
-            <Text style={[styles.actionButtonText, hasLiked && styles.actionButtonTextActive]}>
-              {hasLiked ? "Curtido" : "Curtir"}
-            </Text>
-          </TouchableOpacity>
+          />
 
-          <TouchableOpacity
-            style={styles.actionButton}
+          <ActionButton
+            icon={<MessageSquare size={20} color="#475569" />}
+            count={occurrence.commentsCount}
+            label={occurrence.commentsCount === 1 ? "Comentário" : "Comentários"}
             onPress={() => router.push({ pathname: "/comentarios/[id]", params: { id: occurrence.id } })}
-            activeOpacity={0.8}
-          >
-            <MessageSquare size={20} color="#4B5563" />
-            <Text style={styles.actionButtonText}>Comentários</Text>
-            <ChevronRight size={16} color="#9CA3AF" />
-          </TouchableOpacity>
+          />
         </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
-const cardShadow = Platform.select({
-  web: { boxShadow: "0px 8px 24px rgba(0,0,0,0.06)" } as any,
-  default: {
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 3,
-  },
-});
-
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#F3F4F6",
+    backgroundColor: theme.colors.background,
   },
-  container: {
+  notFoundContainer: {
     flex: 1,
-    backgroundColor: "#F3F4F6",
+    justifyContent: "center",
+    alignItems: "center",
   },
   scrollContent: {
-    padding: 16,
-    paddingBottom: 32,
-  },
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 24,
     padding: 20,
-    ...cardShadow,
+    paddingBottom: 40,
   },
-  header: {
+  categoryTimeRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
-    paddingBottom: 16,
+    marginBottom: 16,
   },
-  authorBadge: {
+  badgeContainer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
   },
-  authorAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#E5E7EB",
+  badgeIcon: {
+    marginRight: 6,
+  },
+  badgePill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: theme.borderRadius.squircle,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontFamily: theme.typography.fonts.bold,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  timeAgoText: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.secondary,
+    fontFamily: theme.typography.fonts.medium,
+    fontWeight: "500",
+  },
+  mapCard: {
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    overflow: "hidden",
+    marginBottom: 20,
+    ...Platform.select({
+      web: { boxShadow: "0px 4px 12px rgba(0,0,0,0.05)" } as any,
+      default: {
+        shadowColor: "#000",
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 2,
+      },
+    }),
+  },
+  map: {
+    width: "100%",
+    height: 180,
+  },
+  markerWrapper: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  webMapContainer: {
+    width: "100%",
+    height: 180,
+    backgroundColor: theme.colors.borderLight,
+    position: "relative",
+    overflow: "hidden",
+  },
+  webStreet: {
+    position: "absolute",
+    backgroundColor: theme.colors.cardBackground,
+  },
+  webPark: {
+    position: "absolute",
+    top: 20,
+    left: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#E6F4EA",
+  },
+  webWater: {
+    position: "absolute",
+    bottom: -10,
+    right: -10,
+    width: 100,
+    height: 80,
+    borderTopLeftRadius: 60,
+    backgroundColor: theme.colors.lightBg,
+  },
+  webMarkerContainer: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    marginLeft: -16,
+    marginTop: -32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addressSection: {
+    flexDirection: "row",
+    padding: 16,
+    alignItems: "center",
+    backgroundColor: theme.colors.cardBackground,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.borderLight,
+  },
+  addressIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: theme.colors.lightBg,
     justifyContent: "center",
     alignItems: "center",
+    marginRight: 12,
   },
-  authorName: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1F2937",
+  addressTextContainer: {
+    flex: 1,
   },
-  dateText: {
-    fontSize: 12,
-    color: "#9CA3AF",
+  addressTitle: {
+    fontSize: theme.typography.sizes.base,
+    fontWeight: "600",
+    color: theme.colors.text.primary,
+    fontFamily: theme.typography.fonts.semiBold,
+  },
+  addressSubtitle: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.secondary,
+    fontFamily: theme.typography.fonts.regular,
     marginTop: 2,
   },
-  typeBadge: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 50,
+  sectionHeaderContainer: {
+    marginTop: 20,
+    marginBottom: 8,
   },
-  typeBadgeText: {
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  locationContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 20,
-    backgroundColor: "#EFF6FF",
-    padding: 12,
-    borderRadius: 12,
-  },
-  locationText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#1E40AF",
-  },
-  coordinatesText: {
+  sectionHeader: {
     fontSize: 13,
-    color: "#4B5563",
+    fontWeight: "600",
+    color: theme.colors.text.secondary,
+    fontFamily: theme.typography.fonts.semiBold,
+    letterSpacing: 1,
   },
-  image: {
-    width: "100%",
-    height: 200,
-    borderRadius: 16,
-    marginBottom: 20,
-  },
-  descriptionSection: {
-    marginBottom: 24,
-  },
-  descriptionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1F2937",
+  descriptionBox: {
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: 16,
     marginBottom: 8,
   },
   descriptionText: {
-    fontSize: 15,
-    color: "#4B5563",
+    fontSize: theme.typography.sizes.base,
+    color: theme.colors.text.primary,
+    fontFamily: theme.typography.fonts.regular,
     lineHeight: 22,
   },
-  statsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-    marginBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
-    paddingBottom: 12,
+  evidenceSection: {
+    marginBottom: 8,
   },
-  statItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  statLabel: {
-    fontSize: 13,
-    color: "#6B7280",
-    fontWeight: "500",
-  },
-  actionsContainer: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
+  evidenceImage: {
+    width: "100%",
+    height: 220,
     borderRadius: 12,
-    height: 48,
-    gap: 8,
   },
-  actionButtonActive: {
-    backgroundColor: "#208AEF",
-    borderColor: "#208AEF",
-  },
-  actionButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#4B5563",
-  },
-  actionButtonTextActive: {
-    color: "#FFFFFF",
+  actionsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+    marginTop: 24,
+    marginBottom: 20,
   },
   errorText: {
-    fontSize: 16,
-    color: "#EF4444",
+    fontSize: theme.typography.sizes.lg,
+    color: theme.colors.text.secondary,
     textAlign: "center",
-    marginTop: 40,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#F3F4F6",
-    paddingHorizontal: 32,
-    paddingVertical: 64,
-  },
-  errorEmoji: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  errorTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#EF4444",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  retryButton: {
-    backgroundColor: "#208AEF",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "600",
+    fontFamily: theme.typography.fonts.regular,
   },
 });

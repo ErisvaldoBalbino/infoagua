@@ -1,17 +1,91 @@
-import React from "react";
-import { Alert, StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Platform } from "react-native";
-import { useRouter } from "expo-router";
+import { useState, useEffect, useCallback } from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  ActivityIndicator,
+  Platform,
+  ScrollView,
+  RefreshControl,
+} from "react-native";
+import { Alert } from "../utils/alert";
+import { useRouter, Stack } from "expo-router";
 import { useAuth } from "../context/AuthContext";
-import { User, LogOut, LogIn, Mail } from "lucide-react-native";
+import { occurrencesService } from "../services/api/occurrences.service";
+import { Button } from "../components/Button";
+import { theme } from "../constants/theme";
+import { CustomHeader } from "../components/CustomHeader";
+import {
+  User,
+  LogOut,
+  LogIn,
+  AlertTriangle,
+  ThumbsUp,
+  ChevronRight,
+  Pencil,
+} from "lucide-react-native";
+
+function formatMemberSince(dateString?: string) {
+  if (!dateString) return "Membro desde --";
+  try {
+    const date = new Date(dateString);
+    const months = [
+      "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+      "Jul", "Ago", "Set", "Out", "Nov", "Dez"
+    ];
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    return `Membro desde ${month} ${year}`;
+  } catch {
+    return "Membro desde --";
+  }
+}
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, isAuthenticated, logout, isLoading } = useAuth();
+  
+  const [stats, setStats] = useState({ reports: 0, confirmations: 0 });
+  const [isStatsLoading, setIsStatsLoading] = useState(!isAuthenticated || !user ? false : true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const fetchStats = useCallback(async () => {
+    if (!isAuthenticated || !user) {
+      return;
+    }
+    try {
+      const data = await occurrencesService.findAll();
+      const myOccurrences = data.filter((occ) => occ.user.id === user.id);
+      const totalConfirmations = myOccurrences.reduce((acc, curr) => acc + (curr.likesCount || 0), 0);
+      setStats({
+        reports: myOccurrences.length,
+        confirmations: totalConfirmations,
+      });
+    } catch (error) {
+      console.error("Error fetching profile stats:", error);
+    } finally {
+      setIsStatsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [isAuthenticated, user]);
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      fetchStats();
+    }
+  }, [fetchStats, isAuthenticated, user]);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    fetchStats();
+  };
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#208AEF" />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
@@ -19,22 +93,25 @@ export default function ProfileScreen() {
   if (!isAuthenticated) {
     return (
       <View style={styles.container}>
-        <View style={styles.card}>
-          <View style={styles.iconWrapper}>
-            <User size={32} color="#208AEF" />
+        <Stack.Screen options={{ headerShown: false }} />
+        <CustomHeader title="Perfil" />
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", width: "100%" }}>
+          <View style={styles.authCard}>
+            <View style={styles.authIconWrapper}>
+              <User size={32} color={theme.colors.primary} />
+            </View>
+            <Text style={styles.restrictedTitle}>Você não está conectado</Text>
+            <Text style={styles.restrictedSubtitle}>
+              Conecte-se para gerenciar suas ocorrências e ver seus dados de perfil.
+            </Text>
+            <Button
+              title="Entrar / Criar Conta"
+              onPress={() => router.push("/(auth)/login")}
+              variant="primary"
+              icon={<LogIn size={18} color="#FFFFFF" />}
+              style={{ width: "100%" }}
+            />
           </View>
-          <Text style={styles.restrictedTitle}>Você não está conectado</Text>
-          <Text style={styles.restrictedSubtitle}>
-            Conecte-se para gerenciar suas ocorrências e ver seus dados de perfil.
-          </Text>
-          <TouchableOpacity 
-            style={styles.loginButton} 
-            onPress={() => router.push("/(auth)/login")}
-            activeOpacity={0.85}
-          >
-            <LogIn size={18} color="#FFFFFF" />
-            <Text style={styles.loginButtonText}>Entrar / Criar Conta</Text>
-          </TouchableOpacity>
         </View>
       </View>
     );
@@ -42,152 +119,327 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.card}>
-        <View style={styles.avatarWrapper}>
-          <Text style={styles.avatarText}>
-            {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
-          </Text>
-        </View>
-        
-        <Text style={styles.nameText}>{user?.name}</Text>
-        
-        <View style={styles.emailContainer}>
-          <Mail size={16} color="#6B7280" />
-          <Text style={styles.emailText}>{user?.email}</Text>
+      <Stack.Screen options={{ headerShown: false }} />
+      <CustomHeader title="Perfil" />
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
+          />
+        }
+      >
+        {/* Profile Info Section */}
+        <View style={styles.profileHeader}>
+          <View style={styles.avatarRing}>
+            <View style={styles.avatarInner}>
+              <User size={54} color="#94A3B8" strokeWidth={1.5} />
+            </View>
+          </View>
+          <Text style={styles.nameText}>{user?.name || "Usuário"}</Text>
+          <Text style={styles.memberText}>{formatMemberSince(user?.createdAt)}</Text>
         </View>
 
-        <TouchableOpacity 
-          style={styles.logoutButton} 
-          onPress={async () => {
-            try {
-              await logout();
-            } catch {
-              Alert.alert("Aviso", "Ocorreu um erro ao sair, mas você será redirecionado.");
-            } finally {
-              router.replace("/(auth)/login");
-            }
+        {/* Minha Atividade Section */}
+        <Text style={styles.sectionTitle}>MINHA ATIVIDADE</Text>
+        <View style={styles.statsRow}>
+          {/* Card: Relatos feitos */}
+          <View style={styles.statCard}>
+            <View style={[styles.iconWrapper, { backgroundColor: theme.colors.lightBg }]}>
+              <AlertTriangle size={22} color={theme.colors.dark} strokeWidth={2} />
+            </View>
+            {isStatsLoading ? (
+              <ActivityIndicator size="small" color={theme.colors.dark} style={styles.statLoader} />
+            ) : (
+              <Text style={[styles.statValue, { color: theme.colors.dark }]}>{stats.reports}</Text>
+            )}
+            <Text style={styles.statLabel}>Relatos feitos</Text>
+          </View>
+
+          {/* Card: Confirmações */}
+          <View style={styles.statCard}>
+            <View style={[styles.iconWrapper, { backgroundColor: theme.colors.status.successBg }]}>
+              <ThumbsUp size={22} color={theme.colors.status.success} strokeWidth={2} />
+            </View>
+            {isStatsLoading ? (
+              <ActivityIndicator size="small" color={theme.colors.status.success} style={styles.statLoader} />
+            ) : (
+              <Text style={[styles.statValue, { color: theme.colors.status.success }]}>{stats.confirmations}</Text>
+            )}
+            <Text style={styles.statLabel}>Confirmações</Text>
+          </View>
+        </View>
+
+        {/* Configurações Section */}
+        <Text style={styles.sectionTitle}>CONFIGURAÇÕES</Text>
+        
+        {/* Option: Editar Perfil */}
+        <TouchableOpacity
+          style={styles.settingCard}
+          activeOpacity={0.7}
+          onPress={() => {
+            Alert.alert("Editar Perfil", "Esta funcionalidade será disponibilizada em breve.");
           }}
-          activeOpacity={0.85}
         >
-          <LogOut size={18} color="#FFFFFF" />
-          <Text style={styles.logoutButtonText}>Sair da Conta</Text>
+          <View style={styles.settingLeft}>
+            <View style={styles.editIconContainer}>
+              <User size={20} color="#475569" strokeWidth={2} />
+              <View style={styles.pencilOverlay}>
+                <Pencil size={8} color="#FFFFFF" strokeWidth={3} />
+              </View>
+            </View>
+            <Text style={styles.settingText}>Editar Perfil</Text>
+          </View>
+          <ChevronRight size={20} color="#94A3B8" />
         </TouchableOpacity>
-      </View>
+
+        {/* Option: Sair */}
+        <TouchableOpacity
+          style={styles.logoutRow}
+          activeOpacity={0.7}
+          onPress={async () => {
+            Alert.alert(
+              "Sair da Conta",
+              "Deseja realmente sair da sua conta?",
+              [
+                { text: "Cancelar", style: "cancel" },
+                {
+                  text: "Sair",
+                  style: "destructive",
+                  onPress: async () => {
+                    try {
+                      await logout();
+                    } catch {
+                      Alert.alert("Aviso", "Ocorreu um erro ao sair, mas você será redirecionado.");
+                    } finally {
+                      router.replace("/(auth)/login");
+                    }
+                  }
+                }
+              ]
+            );
+          }}
+        >
+          <LogOut size={22} color="#DC2626" strokeWidth={2} />
+          <Text style={styles.logoutText}>Sair</Text>
+        </TouchableOpacity>
+      </ScrollView>
     </View>
   );
 }
 
 const cardShadow = Platform.select({
-  web: { boxShadow: "0px 8px 20px rgba(0,0,0,0.06)" } as any,
+  web: { boxShadow: "0px 4px 12px rgba(0,0,0,0.03)" } as any,
   default: {
     shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 15,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
 });
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  loadingContainer: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#EBF3FC",
-    padding: 24,
+    backgroundColor: theme.colors.background,
   },
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 24,
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 40,
+    alignItems: "center",
+  },
+  headerLeftButton: {
+    paddingRight: 16,
+    paddingVertical: 8,
+  },
+  profileHeader: {
+    alignItems: "center",
+    marginBottom: 28,
+    width: "100%",
+  },
+  avatarRing: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+    backgroundColor: theme.colors.cardBackground,
+  },
+  avatarInner: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: theme.colors.borderLight,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  nameText: {
+    fontSize: theme.typography.sizes.xxl,
+    fontFamily: theme.typography.fonts.bold,
+    color: theme.colors.text.primary,
+    marginBottom: 4,
+  },
+  memberText: {
+    fontSize: theme.typography.sizes.md,
+    fontFamily: theme.typography.fonts.medium,
+    color: theme.colors.text.tertiary,
+  },
+  sectionTitle: {
+    alignSelf: "flex-start",
+    fontSize: 12,
+    fontFamily: theme.typography.fonts.bold,
+    color: theme.colors.text.secondary,
+    letterSpacing: 1,
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  statsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 16,
+    width: "100%",
+    marginBottom: 16,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: 16,
+    alignItems: "flex-start",
+    ...cardShadow,
+  },
+  iconWrapper: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  statValue: {
+    fontSize: theme.typography.sizes.display,
+    fontFamily: theme.typography.fonts.bold,
+    marginBottom: 6,
+  },
+  statLoader: {
+    marginVertical: 6,
+  },
+  statLabel: {
+    fontSize: theme.typography.sizes.sm,
+    fontFamily: theme.typography.fonts.semiBold,
+    color: theme.colors.text.secondary,
+  },
+  settingCard: {
+    width: "100%",
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+    ...cardShadow,
+  },
+  settingLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  editIconContainer: {
+    width: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
+  },
+  pencilOverlay: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    backgroundColor: theme.colors.text.secondary,
+    borderRadius: 6,
+    width: 12,
+    height: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: theme.colors.cardBackground,
+  },
+  settingText: {
+    fontSize: theme.typography.sizes.base,
+    fontFamily: theme.typography.fonts.semiBold,
+    color: theme.colors.text.primary,
+  },
+  logoutRow: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    marginTop: 8,
+  },
+  logoutText: {
+    fontSize: theme.typography.sizes.lg,
+    fontFamily: theme.typography.fonts.semiBold,
+    color: theme.colors.status.danger,
+  },
+  authCard: {
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: theme.borderRadius.sheet,
     paddingHorizontal: 24,
     paddingVertical: 36,
     width: "100%",
     maxWidth: 380,
     alignItems: "center",
+    alignSelf: "center",
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     ...cardShadow,
   },
-  iconWrapper: {
+  authIconWrapper: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: theme.colors.lightBg,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 20,
   },
   restrictedTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#1F2937",
+    fontSize: theme.typography.sizes.xxl,
+    fontFamily: theme.typography.fonts.bold,
+    color: theme.colors.text.primary,
     marginBottom: 12,
     textAlign: "center",
   },
   restrictedSubtitle: {
-    fontSize: 14,
-    color: "#6B7280",
+    fontSize: theme.typography.sizes.md,
+    fontFamily: theme.typography.fonts.regular,
+    color: theme.colors.text.tertiary,
     textAlign: "center",
     lineHeight: 20,
     marginBottom: 28,
     paddingHorizontal: 8,
-  },
-  loginButton: {
-    flexDirection: "row",
-    backgroundColor: "#208AEF",
-    borderRadius: 50,
-    height: 50,
-    width: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 8,
-  },
-  loginButtonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  avatarWrapper: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#208AEF",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  avatarText: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#FFFFFF",
-  },
-  nameText: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#1F2937",
-    marginBottom: 6,
-  },
-  emailContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 32,
-  },
-  emailText: {
-    fontSize: 14,
-    color: "#6B7280",
-  },
-  logoutButton: {
-    flexDirection: "row",
-    backgroundColor: "#EF4444",
-    borderRadius: 50,
-    height: 50,
-    width: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 8,
-  },
-  logoutButtonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "600",
   },
 });

@@ -1,62 +1,233 @@
-import React from "react";
-import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Platform } from "react-native";
+import { useState } from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  ActivityIndicator,
+  Platform,
+  TextInput,
+  ScrollView,
+} from "react-native";
+import { Alert } from "../../utils/alert";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
-import { Lock, LogIn } from "lucide-react-native";
+import {
+  Lock,
+  LogIn,
+  MapPin,
+  Pencil,
+  Droplet,
+  Wrench,
+  FlaskConical,
+  CheckCircle,
+  Camera,
+} from "lucide-react-native";
+import { occurrencesService, OccurrenceType } from "../../services/api/occurrences.service";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Button } from "../../components/Button";
+import { theme } from "../../constants/theme";
 
 export default function ReportTab() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { isAuthenticated, isLoading } = useAuth();
-  const selectedCity = params.cidade ? String(params.cidade) : null;
+  const insets = useSafeAreaInsets();
+
+  const address = String(params.address || "Boa Viagem, Recife");
+  const details = String(params.details || "Av. Boa Viagem, 1234");
+  const latitude = Number(params.latitude || -8.1156);
+  const longitude = Number(params.longitude || -34.8924);
+  const city = String(params.city || "Recife");
+
+  const [selectedCategory, setSelectedCategory] = useState<OccurrenceType>("shortage");
+  const [description, setDescription] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const categories = [
+    { id: "shortage" as OccurrenceType, label: "Falta d'água", icon: Droplet },
+    { id: "leak" as OccurrenceType, label: "Vazamento", icon: Wrench },
+    { id: "quality" as OccurrenceType, label: "Qualidade", icon: FlaskConical },
+    { id: "return" as OccurrenceType, label: "Retorno", icon: CheckCircle },
+  ];
+
+  const handleSelectLocation = () => {
+    router.push({
+      pathname: "/localizacao",
+      params: {
+        currentAddress: address,
+        currentDetails: details,
+        currentLat: latitude,
+        currentLng: longitude,
+        currentCity: city,
+      },
+    });
+  };
+
+  const handleSend = async () => {
+    setIsSubmitting(true);
+    try {
+      await occurrencesService.create({
+        type: selectedCategory,
+        latitude,
+        longitude,
+        city,
+        description,
+      });
+
+      if (Platform.OS === "web") {
+        alert("Ocorrência enviada com sucesso!");
+      } else {
+        Alert.alert("Sucesso", "Ocorrência enviada com sucesso!");
+      }
+
+      setDescription("");
+      router.push("/(tabs)/mapa");
+    } catch (error: any) {
+      console.error("Erro ao enviar ocorrência:", error);
+      const errorMsg = error?.response?.data?.message || "Não foi possível enviar a ocorrência no momento.";
+      if (Platform.OS === "web") {
+        alert("Erro: " + errorMsg);
+      } else {
+        Alert.alert("Erro ao enviar", errorMsg);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#208AEF" />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
 
   if (!isAuthenticated) {
     return (
-      <View style={styles.container}>
-        <View style={styles.card}>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.authCard}>
           <View style={styles.iconWrapper}>
-            <Lock size={32} color="#208AEF" />
+            <Lock size={32} color={theme.colors.primary} />
           </View>
           <Text style={styles.restrictedTitle}>Acesso Restrito</Text>
           <Text style={styles.restrictedSubtitle}>
             Para relatar uma ocorrência de falta de água, vazamento ou qualidade, você precisa estar conectado à sua conta.
           </Text>
-          <TouchableOpacity 
-            style={styles.loginButton} 
+          <Button
+            title="Fazer Login / Criar Conta"
             onPress={() => router.push("/(auth)/login")}
-            activeOpacity={0.85}
-          >
-            <LogIn size={18} color="#FFFFFF" style={styles.buttonIcon} />
-            <Text style={styles.loginButtonText}>Fazer Login / Criar Conta</Text>
-          </TouchableOpacity>
+            variant="primary"
+            icon={<LogIn size={18} color="#FFFFFF" />}
+            style={{ width: "100%" }}
+          />
         </View>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Relatar Ocorrência</Text>
-      
-      <Text style={styles.cityText}>
-        Cidade Selecionada: {selectedCity ? selectedCity : "Nenhuma"}
-      </Text>
-
-      <TouchableOpacity 
-        style={styles.button}
-        onPress={() => router.push("/localizacao")}
+    <ScrollView
+      style={[styles.scrollContainer, { paddingTop: Math.max(insets.top, 20) }]}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* 1. Current Location Card */}
+      <TouchableOpacity
+        style={styles.locationCard}
+        activeOpacity={0.8}
+        onPress={handleSelectLocation}
       >
-        <Text style={styles.buttonText}>Selecionar Cidade</Text>
+        <View style={styles.locationIconContainer}>
+          <MapPin size={24} color="#FFFFFF" />
+        </View>
+        <View style={styles.locationTextContainer}>
+          <Text style={styles.locationTitle}>LOCALIZAÇÃO ATUAL</Text>
+          <Text style={styles.locationName}>{address}</Text>
+          <Text style={styles.locationAddress}>{details}</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.editButton}
+          activeOpacity={0.7}
+          onPress={handleSelectLocation}
+        >
+          <Pencil size={20} color={theme.colors.primary} />
+        </TouchableOpacity>
       </TouchableOpacity>
-    </View>
+
+      {/* 2. Category Carousel */}
+      <View style={styles.sectionContainer}>
+        <Text style={styles.sectionTitle}>Selecione a Categoria</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.carouselContent}
+        >
+          {categories.map((cat) => {
+            const IconComponent = cat.icon;
+            const isSelected = selectedCategory === cat.id;
+            return (
+              <TouchableOpacity
+                key={cat.id}
+                style={[
+                  styles.categoryCard,
+                  isSelected && styles.categoryCardSelected,
+                ]}
+                activeOpacity={0.8}
+                onPress={() => setSelectedCategory(cat.id)}
+              >
+                <View style={styles.categoryIconContainer}>
+                  <IconComponent
+                    size={28}
+                    color={isSelected ? "#1070D0" : "#64748B"}
+                  />
+                </View>
+                <Text
+                  style={[
+                    styles.categoryLabel,
+                    isSelected && styles.categoryLabelSelected,
+                  ]}
+                >
+                  {cat.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* 3. Description (Optional) */}
+      <View style={styles.sectionContainer}>
+        <Text style={styles.sectionTitle}>Descrição (Opcional)</Text>
+        <TextInput
+          style={styles.descriptionInput}
+          multiline
+          numberOfLines={4}
+          placeholder="Forneça mais detalhes sobre o problema..."
+          placeholderTextColor="#94A3B8"
+          value={description}
+          onChangeText={setDescription}
+        />
+      </View>
+
+      {/* 4. Evidence (Optional) */}
+      <View style={styles.sectionContainer}>
+        <Text style={styles.sectionTitle}>Evidência (Opcional)</Text>
+        <TouchableOpacity style={styles.evidenceCard} activeOpacity={0.8}>
+          <Camera size={32} color="#94A3B8" />
+          <Text style={styles.evidenceText}>Toque para adicionar foto</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* 5. Submit Button */}
+      <Button
+        title="Enviar"
+        onPress={handleSend}
+        variant="primary"
+        loading={isSubmitting}
+      />
+    </ScrollView>
   );
 }
 
@@ -72,16 +243,30 @@ const cardShadow = Platform.select({
 });
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: theme.colors.background,
+  },
   container: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#EBF3FC",
+    backgroundColor: theme.colors.lightBg,
     padding: 24,
   },
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 24,
+  scrollContainer: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 110,
+  },
+  authCard: {
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: theme.borderRadius.sheet,
     paddingHorizontal: 24,
     paddingVertical: 36,
     width: "100%",
@@ -93,64 +278,140 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: theme.colors.lightBg,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 20,
   },
   restrictedTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#1F2937",
+    fontSize: theme.typography.sizes.xxxl,
+    fontFamily: theme.typography.fonts.bold,
+    color: theme.colors.text.primary,
     marginBottom: 12,
     textAlign: "center",
   },
   restrictedSubtitle: {
-    fontSize: 14,
-    color: "#6B7280",
+    fontSize: theme.typography.sizes.base,
+    fontFamily: theme.typography.fonts.regular,
+    color: theme.colors.text.secondary,
     textAlign: "center",
-    lineHeight: 20,
+    lineHeight: 22,
     marginBottom: 28,
     paddingHorizontal: 8,
   },
-  loginButton: {
+  // Login button styles have been extracted to Button component
+  locationCard: {
     flexDirection: "row",
-    backgroundColor: "#208AEF",
-    borderRadius: 50,
-    height: 50,
-    width: "100%",
+    alignItems: "center",
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginBottom: 24,
+    ...cardShadow,
+  },
+  locationIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: theme.colors.primary,
     justifyContent: "center",
     alignItems: "center",
-    gap: 8,
+    marginRight: 14,
   },
-  buttonIcon: {
-    marginRight: 2,
+  locationTextContainer: {
+    flex: 1,
   },
-  loginButtonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "600",
+  locationTitle: {
+    fontSize: 12,
+    fontFamily: theme.typography.fonts.bold,
+    color: theme.colors.text.secondary,
+    letterSpacing: 0.8,
+    marginBottom: 2,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#111827",
-    marginBottom: 10,
+  locationName: {
+    fontSize: theme.typography.sizes.xl,
+    fontFamily: theme.typography.fonts.bold,
+    color: theme.colors.text.primary,
   },
-  cityText: {
-    fontSize: 16,
-    color: "#4B5563",
-    marginBottom: 20,
+  locationAddress: {
+    fontSize: theme.typography.sizes.md,
+    fontFamily: theme.typography.fonts.regular,
+    color: theme.colors.text.secondary,
+    marginTop: 2,
   },
-  button: {
-    backgroundColor: "#208AEF",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
+  editButton: {
+    padding: 6,
   },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
+  sectionContainer: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: theme.typography.sizes.xl,
+    fontFamily: theme.typography.fonts.bold,
+    color: theme.colors.text.primary,
+    marginBottom: 12,
+  },
+  carouselContent: {
+    paddingRight: 20,
+    gap: 12,
+  },
+  categoryCard: {
+    width: 108,
+    height: 108,
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 8,
+  },
+  categoryCardSelected: {
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.lightBg,
+  },
+  categoryIconContainer: {
+    marginBottom: 8,
+  },
+  categoryLabel: {
+    fontSize: 14,
+    fontFamily: theme.typography.fonts.semiBold,
+    color: theme.colors.text.secondary,
+    textAlign: "center",
+  },
+  categoryLabelSelected: {
+    color: theme.colors.primary,
+    fontFamily: theme.typography.fonts.bold,
+  },
+  descriptionInput: {
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+    padding: 16,
+    minHeight: 140,
+    fontSize: theme.typography.sizes.lg,
+    fontFamily: theme.typography.fonts.regular,
+    color: theme.colors.text.primary,
+    textAlignVertical: "top",
+  },
+  evidenceCard: {
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: theme.colors.border,
+    height: 140,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  evidenceText: {
+    fontSize: theme.typography.sizes.base,
+    fontFamily: theme.typography.fonts.semiBold,
+    color: theme.colors.text.secondary,
+    marginTop: 8,
   },
 });
+
