@@ -1,14 +1,25 @@
 import axios from "axios";
-import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
+import { storage } from "../storage";
 
 export const TOKEN_KEY = "infoagua_token";
 
 /**
- *   Android Emulator  → http://10.0.2.2:3000/v1
- *   Dispositivo real  → http://192.168.x.x:3000/v1
- *   iOS Simulator     → http://localhost:3000/v1
+ *   Android Emulator  → http://10.0.2.2:3000/v1 
+ *   iOS Simulator/Web → http://localhost:3000/v1
+ *   Physical device   → set EXPO_PUBLIC_API_URL in .env
  */
-const BASE_URL = "http://192.168.0.2:3000/v1";
+function resolveBaseUrl(): string {
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
+  if (Platform.OS === "android") {
+    return "http://10.0.2.2:3000/v1";
+  }
+  return "http://localhost:3000/v1";
+}
+
+const BASE_URL = resolveBaseUrl();
 
 export const api = axios.create({
   baseURL: BASE_URL,
@@ -27,26 +38,33 @@ export function onUnauthorized(listener: UnauthorizedListener) {
 }
 
 api.interceptors.request.use(async (config) => {
-  const token = await SecureStore.getItemAsync(TOKEN_KEY);
+  const token = await storage.getItem(TOKEN_KEY);
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-  console.log(`[API Request] ${config.method?.toUpperCase()} -> ${config.baseURL}${config.url}`);
+  if (__DEV__) {
+    console.log(`[API Request] ${config.method?.toUpperCase()} -> ${config.baseURL}${config.url}`);
+  }
   return config;
 });
 
 api.interceptors.response.use(
   (response) => {
-    console.log(`[API Response] ${response.status} <- ${response.config.url}`);
+    if (__DEV__) {
+      console.log(`[API Response] ${response.status} <- ${response.config.url}`);
+    }
     return response;
   },
   async (error) => {
-    console.error(
-      `[API Error] ${error.config?.method?.toUpperCase()} ${error.config?.url} | Message: ${error.message} | Data:`,
-      error.response?.data
-    );
+    if (__DEV__) {
+      console.error(
+        `[API Error] ${error.config?.method?.toUpperCase()} ${error.config?.url}` +
+        ` | status: ${error.response?.status ?? "network"}` +
+        ` | message: ${error.message}`
+      );
+    }
     if (error.response?.status === 401) {
-      await SecureStore.deleteItemAsync(TOKEN_KEY);
+      await storage.deleteItem(TOKEN_KEY);
       unauthorizedListener?.();
     }
     return Promise.reject(error);

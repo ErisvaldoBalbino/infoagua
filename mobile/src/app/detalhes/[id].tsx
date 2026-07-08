@@ -40,6 +40,7 @@ export default function DetailsScreen() {
   const [likesCount, setLikesCount] = useState(0);
   const [hasError, setHasError] = useState(false);
   const [retryTrigger, setRetryTrigger] = useState(0);
+  const [isLiking, setIsLiking] = useState(false);
 
   useEffect(() => {
     async function loadDetails() {
@@ -78,19 +79,23 @@ export default function DetailsScreen() {
 
     if (!occurrence) return;
 
-    try {
-      const newHasLiked = !hasLiked;
-      setHasLiked(newHasLiked);
-      setLikesCount((prev) => (newHasLiked ? prev + 1 : prev - 1));
+    if (isLiking) return;
 
+    const newHasLiked = !hasLiked;
+    setIsLiking(true);
+    setHasLiked(newHasLiked);
+    setLikesCount((prev) => (newHasLiked ? prev + 1 : prev - 1));
+
+    try {
       const result = await occurrencesService.toggleLike(occurrence.id);
-      
       setHasLiked(result.liked);
     } catch (error) {
       console.error("Error liking occurrence:", error);
-      setHasLiked((prev) => !prev);
-      setLikesCount((prev) => (hasLiked ? prev + 1 : prev - 1));
+      setHasLiked(!newHasLiked);
+      setLikesCount((prev) => (newHasLiked ? prev - 1 : prev + 1));
       Alert.alert("Erro", "Não foi possível curtir o relato.");
+    } finally {
+      setIsLiking(false);
     }
   };
 
@@ -206,6 +211,7 @@ export default function DetailsScreen() {
             style={[styles.actionButton, hasLiked && styles.actionButtonActive]}
             onPress={handleLike}
             activeOpacity={0.8}
+            disabled={isLiking}
           >
             <ThumbsUp size={20} color={hasLiked ? "#FFFFFF" : "#4B5563"} />
             <Text style={[styles.actionButtonText, hasLiked && styles.actionButtonTextActive]}>

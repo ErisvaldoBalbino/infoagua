@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Platform } from "react-native";
+import { Alert, StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "../context/AuthContext";
 import { User, LogOut, LogIn, Mail } from "lucide-react-native";
@@ -59,8 +59,13 @@ export default function ProfileScreen() {
         <TouchableOpacity 
           style={styles.logoutButton} 
           onPress={async () => {
-            await logout();
-            router.replace("/(auth)/login");
+            try {
+              await logout();
+            } catch {
+              Alert.alert("Aviso", "Ocorreu um erro ao sair, mas você será redirecionado.");
+            } finally {
+              router.replace("/(auth)/login");
+            }
           }}
           activeOpacity={0.85}
         >

@@ -275,11 +275,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
     padding: 14,
-    shadowColor: "#000",
-    shadowOpacity: 0.02,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+    ...Platform.select({
+      web: { boxShadow: "0px 2px 6px rgba(0,0,0,0.04)" } as any,
+      default: {
+        shadowColor: "#000",
+        shadowOpacity: 0.02,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 1,
+      },
+    }),
   },
   commentHeader: {
     flexDirection: "row",

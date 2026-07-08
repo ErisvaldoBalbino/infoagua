@@ -31,7 +31,7 @@ const typeColors: Record<string, string> = {
 
 export default function HomeTab() {
   const router = useRouter();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, isLoading: isAuthLoading, user } = useAuth();
   const [occurrences, setOccurrences] = useState<OccurrenceResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -130,12 +130,7 @@ export default function HomeTab() {
     <SafeAreaView style={styles.safeArea}>
       {/* Top Header */}
       <View style={styles.header}>
-        <View style={styles.logoContainer}>
-          <Text style={styles.logoEmoji}>💧</Text>
-          <Text style={styles.appName}>InfoÁgua</Text>
-        </View>
-
-        {isAuthenticated ? (
+        {isAuthLoading ? null : isAuthenticated ? (
           <TouchableOpacity
             style={styles.profileButton}
             onPress={() => router.push("/perfil")}

@@ -18,7 +18,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": true,
-      "package": "com.anonymous.infoagua"
+      "package": "br.edu.ifrn.infoagua"
     },
     "web": {
       "output": "static",

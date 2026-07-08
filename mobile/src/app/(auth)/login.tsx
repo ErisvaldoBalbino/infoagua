@@ -39,6 +39,8 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
 
   async function handleLogin() {
+    if (isLoading) return;
+
     if (!email.trim() || !password.trim()) {
       Alert.alert("Atenção", "Preencha e-mail e senha.");
       return;
@@ -48,9 +50,10 @@ export default function LoginScreen() {
     try {
       await login({ email: email.trim(), password });
       router.replace("/(tabs)");
-    } catch (err: any) {
+    } catch (err: unknown) {
       const message =
-        err?.response?.data?.message ?? "Verifique suas credenciais e tente novamente.";
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        "Verifique suas credenciais e tente novamente.";
       Alert.alert("Erro ao entrar", message);
     } finally {
       setIsLoading(false);
@@ -128,11 +131,6 @@ export default function LoginScreen() {
                 )}
               </TouchableOpacity>
             </View>
-
-            {/* Esqueci minha senha */}
-            <TouchableOpacity style={styles.forgotWrapper}>
-              <Text style={styles.forgotText}>Esqueci minha senha</Text>
-            </TouchableOpacity>
 
             {/* Botão entrar */}
             <TouchableOpacity

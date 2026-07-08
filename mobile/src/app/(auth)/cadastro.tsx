@@ -44,6 +44,8 @@ export default function RegisterScreen() {
   const [isLoading, setIsLoading] = useState(false);
 
   async function handleRegister() {
+    if (isLoading) return;
+
     if (!name.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
       Alert.alert("Atenção", "Preencha todos os campos.");
       return;
@@ -215,7 +217,7 @@ export default function RegisterScreen() {
             {/* Rodapé */}
             <View style={styles.footer}>
               <Text style={styles.footerText}>Já tem uma conta? </Text>
-              <TouchableOpacity onPress={() => router.replace("/(auth)/login")}>
+              <TouchableOpacity onPress={() => router.push("/(auth)/login")}>
                 <Text style={styles.footerLink}>Entrar</Text>
               </TouchableOpacity>
             </View>

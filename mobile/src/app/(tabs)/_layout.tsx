@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { LayoutGrid, Map, PlusCircle, History, CloudRain } from "lucide-react-native";
 
 export default function TabLayout() {
@@ -82,11 +82,16 @@ const styles = StyleSheet.create({
     height: 80,
     paddingBottom: 16,
     paddingTop: 8,
-    elevation: 8,
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
+    ...Platform.select({
+      web: { boxShadow: "0px -2px 10px rgba(0,0,0,0.05)" } as any,
+      default: {
+        elevation: 8,
+        shadowColor: "#000000",
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+      },
+    }),
   },
   iconWrapper: {
     width: 64,

@@ -49,6 +49,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch {
         await storage.deleteItem(TOKEN_KEY);
+        setToken(null);
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
