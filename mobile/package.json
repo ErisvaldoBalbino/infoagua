@@ -5,6 +5,7 @@
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",
     "@expo/ui": "~56.0.20",
+    "@react-google-maps/api": "^2.20.8",
     "axios": "^1.18.1",
     "expo": "~56.0.14",
     "expo-constants": "~56.0.18",
@@ -13,6 +14,7 @@
     "expo-font": "~56.0.7",
     "expo-glass-effect": "~56.0.4",
     "expo-image": "~56.0.11",
+    "expo-linear-gradient": "~56.0.4",
     "expo-linking": "~56.0.15",
     "expo-router": "~56.2.13",
     "expo-secure-store": "~56.0.4",
@@ -26,6 +28,7 @@
     "react-dom": "19.2.3",
     "react-native": "0.85.3",
     "react-native-gesture-handler": "~2.31.1",
+    "react-native-maps": "1.27.2",
     "react-native-reanimated": "4.3.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "4.25.2",

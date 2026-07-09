@@ -1,7 +1,6 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -12,39 +11,58 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { Eye, EyeOff, Lock, Mail } from "lucide-react-native";
-import {
-  useFonts,
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-} from "@expo-google-fonts/inter";
+import { Eye, EyeOff, Lock, Mail, AlertCircle } from "lucide-react-native";
+import { theme } from "../../constants/theme";
+import Animated from "react-native-reanimated";
 import { useAuth } from "../../context/AuthContext";
+import { AuthHeader } from "../../components/AuthHeader";
+import { useButtonScale } from "../../hooks/useButtonScale";
 
 export default function LoginScreen() {
   const router = useRouter();
   const { login } = useAuth();
-
-  const [fontsLoaded] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
-  });
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  const [isEmailFocused, setIsEmailFocused] = useState(false);
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [generalError, setGeneralError] = useState("");
+
+  const primaryButton = useButtonScale();
+  const guestButton = useButtonScale();
+
   async function handleLogin() {
     if (isLoading) return;
 
-    if (!email.trim() || !password.trim()) {
-      Alert.alert("Atenção", "Preencha e-mail e senha.");
-      return;
+    setEmailError("");
+    setPasswordError("");
+    setGeneralError("");
+
+    let hasError = false;
+
+    if (!email.trim()) {
+      setEmailError("O e-mail é obrigatório.");
+      hasError = true;
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        setEmailError("Por favor, digite um e-mail válido.");
+        hasError = true;
+      }
     }
+
+    if (!password.trim()) {
+      setPasswordError("A senha é obrigatória.");
+      hasError = true;
+    }
+
+    if (hasError) return;
 
     setIsLoading(true);
     try {
@@ -54,19 +72,16 @@ export default function LoginScreen() {
       const message =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
         "Verifique suas credenciais e tente novamente.";
-      Alert.alert("Erro ao entrar", message);
+      setGeneralError(message);
     } finally {
       setIsLoading(false);
     }
   }
 
-  if (!fontsLoaded) return null;
+
 
   return (
     <View style={styles.root}>
-      <View style={styles.bgTop} />
-      <View style={styles.bgBottom} />
-
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -76,48 +91,83 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Logo area */}
-          <View style={styles.logoWrapper}>
-            <View style={styles.logoIcon}>
-              <Text style={styles.logoEmoji}>💧</Text>
-            </View>
-            <Text style={styles.appName}>InfoÁgua</Text>
-          </View>
+          <AuthHeader />
 
-          {/* Card */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Entrar</Text>
+          {/* Form Content Area */}
+          <View style={styles.formContainer}>
+            <Text style={styles.screenTitle}>Entrar</Text>
+            <Text style={styles.screenSubtitle}>Por favor, faça login para continuar</Text>
+
+            {!!generalError && (
+              <View style={styles.generalErrorContainer}>
+                <AlertCircle size={20} color={theme.colors.status.danger} style={styles.generalErrorIcon} />
+                <Text style={styles.generalErrorText}>{generalError}</Text>
+              </View>
+            )}
 
             {/* E-mail */}
             <Text style={styles.label}>E-mail</Text>
-            <View style={styles.inputWrapper}>
-              <Mail size={18} color="#9CA3AF" style={styles.inputIcon} />
+            <View style={[
+              styles.inputWrapper,
+              isEmailFocused && styles.inputWrapperFocused,
+              !!emailError && styles.inputWrapperError,
+              !!emailError && { marginBottom: 6 }
+            ]}>
+              <Mail
+                size={18}
+                color={emailError ? theme.colors.status.danger : (isEmailFocused ? theme.colors.secondary : theme.colors.text.tertiary)}
+                style={styles.inputIcon}
+              />
               <TextInput
                 style={styles.input}
                 placeholder="Digite seu e-mail"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={theme.colors.text.tertiary}
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  if (emailError) setEmailError("");
+                  if (generalError) setGeneralError("");
+                }}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
                 returnKeyType="next"
+                onFocus={() => setIsEmailFocused(true)}
+                onBlur={() => setIsEmailFocused(false)}
               />
             </View>
+            {!!emailError && (
+              <Text style={styles.errorText}>{emailError}</Text>
+            )}
 
             {/* Senha */}
             <Text style={styles.label}>Senha</Text>
-            <View style={styles.inputWrapper}>
-              <Lock size={18} color="#9CA3AF" style={styles.inputIcon} />
+            <View style={[
+              styles.inputWrapper,
+              isPasswordFocused && styles.inputWrapperFocused,
+              !!passwordError && styles.inputWrapperError,
+              !!passwordError && { marginBottom: 6 }
+            ]}>
+              <Lock
+                size={18}
+                color={passwordError ? theme.colors.status.danger : (isPasswordFocused ? theme.colors.secondary : theme.colors.text.tertiary)}
+                style={styles.inputIcon}
+              />
               <TextInput
                 style={[styles.input, styles.inputPassword]}
                 placeholder="Digite sua senha"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={theme.colors.text.tertiary}
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  if (passwordError) setPasswordError("");
+                  if (generalError) setGeneralError("");
+                }}
                 secureTextEntry={!showPassword}
                 returnKeyType="done"
                 onSubmitEditing={handleLogin}
+                onFocus={() => setIsPasswordFocused(true)}
+                onBlur={() => setIsPasswordFocused(false)}
               />
               <TouchableOpacity
                 onPress={() => setShowPassword((v) => !v)}
@@ -125,35 +175,53 @@ export default function LoginScreen() {
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 {showPassword ? (
-                  <EyeOff size={18} color="#9CA3AF" />
+                  <EyeOff size={18} color={passwordError ? theme.colors.status.danger : (isPasswordFocused ? theme.colors.secondary : theme.colors.text.tertiary)} />
                 ) : (
-                  <Eye size={18} color="#9CA3AF" />
+                  <Eye size={18} color={passwordError ? theme.colors.status.danger : (isPasswordFocused ? theme.colors.secondary : theme.colors.text.tertiary)} />
                 )}
               </TouchableOpacity>
             </View>
+            {!!passwordError && (
+              <Text style={styles.errorText}>{passwordError}</Text>
+            )}
 
             {/* Botão entrar */}
-            <TouchableOpacity
-              style={[styles.primaryButton, isLoading && styles.primaryButtonDisabled]}
-              onPress={handleLogin}
-              disabled={isLoading}
-              activeOpacity={0.85}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.primaryButtonText}>Entrar →</Text>
-              )}
-            </TouchableOpacity>
+            <Animated.View style={primaryButton.animatedStyle}>
+              <TouchableOpacity
+                style={[styles.primaryButton, isLoading && styles.primaryButtonDisabled]}
+                onPress={handleLogin}
+                onPressIn={primaryButton.onPressIn}
+                onPressOut={primaryButton.onPressOut}
+                disabled={isLoading}
+                activeOpacity={0.85}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color={theme.colors.text.light} />
+                ) : (
+                  <Text style={styles.primaryButtonText}>Entrar</Text>
+                )}
+              </TouchableOpacity>
+            </Animated.View>
+
+            {/* Divisor */}
+            <View style={styles.dividerWrapper}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>ou</Text>
+              <View style={styles.dividerLine} />
+            </View>
 
             {/* Botão visitante */}
-            <TouchableOpacity
-              style={styles.guestButton}
-              onPress={() => router.replace("/(tabs)")}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.guestButtonText}>Continuar como Visitante</Text>
-            </TouchableOpacity>
+            <Animated.View style={guestButton.animatedStyle}>
+              <TouchableOpacity
+                style={styles.ghostButton}
+                onPress={() => router.replace("/(tabs)")}
+                onPressIn={guestButton.onPressIn}
+                onPressOut={guestButton.onPressOut}
+                activeOpacity={0.75}
+              >
+                <Text style={styles.ghostButtonText}>Entrar como visitante</Text>
+              </TouchableOpacity>
+            </Animated.View>
 
             {/* Rodapé */}
             <View style={styles.footer}>
@@ -169,124 +237,103 @@ export default function LoginScreen() {
   );
 }
 
-const BLUE = "#1A6FBB";
-const BLUE_LIGHT = "#208AEF";
-
-const cardShadow = Platform.select({
-  web: { boxShadow: "0px 8px 20px rgba(0,0,0,0.10)" } as any,
-  default: {
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
-  },
-});
-
-const logoShadow = Platform.select({
-  web: { boxShadow: "0px 4px 12px rgba(0,0,0,0.12)" } as any,
-  default: {
-    shadowColor: "#000",
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
-  },
-});
-
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#C9DEFF",
-  },
-  bgTop: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: "#C9DEFF",
-  },
-  bgBottom: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: "40%",
-    backgroundColor: "#D8E8F8",
+    backgroundColor: theme.colors.cardBackground,
   },
   flex: { flex: 1 },
   scroll: {
     flexGrow: 1,
-    justifyContent: "center",
-    paddingHorizontal: 24,
-    paddingVertical: 48,
+    backgroundColor: theme.colors.cardBackground,
   },
 
-  // Logo
-  logoWrapper: {
-    alignItems: "center",
+  formContainer: {
+    flex: 1,
+    paddingHorizontal: 28,
+    paddingBottom: 40,
+    backgroundColor: theme.colors.cardBackground,
+  },
+  screenTitle: {
+    fontSize: theme.typography.sizes.display,
+    fontFamily: theme.typography.fonts.bold,
+    color: theme.colors.text.primary,
+    textAlign: "left",
+    marginBottom: 6,
+  },
+  screenSubtitle: {
+    fontSize: theme.typography.sizes.md,
+    fontFamily: theme.typography.fonts.regular,
+    color: theme.colors.text.secondary,
+    textAlign: "left",
     marginBottom: 28,
   },
-  logoIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 18,
-    backgroundColor: "#FFFFFF",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
-    ...logoShadow,
-  },
-  logoEmoji: {
-    fontSize: 36,
-  },
-  appName: {
-    fontSize: 26,
-    fontFamily: "Inter_700Bold",
-    color: "#1A3A5C",
-    letterSpacing: 0.4,
-  },
 
-  // Card
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    paddingHorizontal: 24,
-    paddingVertical: 32,
-    ...cardShadow,
-  },
-  cardTitle: {
-    fontSize: 22,
-    fontFamily: "Inter_700Bold",
-    color: BLUE_LIGHT,
-    textAlign: "center",
-    marginBottom: 24,
-  },
-
-  // Labels & inputs
   label: {
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
-    color: "#374151",
-    marginBottom: 6,
+    fontSize: theme.typography.sizes.sm,
+    fontFamily: theme.typography.fonts.semiBold,
+    color: theme.colors.text.secondary,
+    marginBottom: 8,
   },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F3F4F6",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    paddingHorizontal: 12,
-    marginBottom: 16,
-    height: 50,
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius.button,
+    borderWidth: 1.5,
+    borderColor: theme.colors.borderLight,
+    paddingHorizontal: 16,
+    marginBottom: 20,
+    height: 54,
+  },
+  inputWrapperFocused: {
+    borderColor: theme.colors.secondary,
+    backgroundColor: theme.colors.cardBackground,
+  },
+  inputWrapperError: {
+    borderColor: theme.colors.status.danger,
+    backgroundColor: theme.colors.status.dangerBg,
+  },
+  errorText: {
+    color: theme.colors.status.danger,
+    fontSize: 12,
+    fontFamily: theme.typography.fonts.regular,
+    marginBottom: 14,
+    marginLeft: 4,
+  },
+  generalErrorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: theme.colors.status.dangerBg,
+    borderWidth: 1.5,
+    borderColor: theme.colors.status.danger,
+    borderRadius: theme.borderRadius.button,
+    padding: 14,
+    marginBottom: 20,
+  },
+  generalErrorIcon: {
+    marginRight: 10,
+  },
+  generalErrorText: {
+    flex: 1,
+    color: theme.colors.status.danger,
+    fontSize: 14,
+    fontFamily: theme.typography.fonts.semiBold,
   },
   inputIcon: {
-    marginRight: 10,
+    marginRight: 12,
   },
   input: {
     flex: 1,
     fontSize: 15,
-    fontFamily: "Inter_400Regular",
-    color: "#111827",
+    fontFamily: theme.typography.fonts.regular,
+    color: theme.colors.text.primary,
     height: "100%",
+    ...Platform.select({
+      web: {
+        outlineStyle: "none",
+      } as any,
+    }),
   },
   inputPassword: {
     paddingRight: 4,
@@ -295,66 +342,81 @@ const styles = StyleSheet.create({
     padding: 4,
   },
 
-  // Forgot
-  forgotWrapper: {
-    alignSelf: "flex-end",
-    marginTop: -8,
-    marginBottom: 20,
-  },
-  forgotText: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    color: BLUE_LIGHT,
-  },
-
-  // Primary button
   primaryButton: {
-    backgroundColor: BLUE,
-    borderRadius: 50,
-    height: 52,
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.borderRadius.button,
+    height: 54,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 12,
+    marginTop: 10,
+    marginBottom: 24,
+    ...Platform.select({
+      web: { boxShadow: `0px 4px 12px ${theme.colors.primary}40` } as any,
+      default: {
+        shadowColor: theme.colors.primary,
+        shadowOpacity: 0.25,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 4,
+      },
+    }),
   },
   primaryButtonDisabled: {
     opacity: 0.7,
   },
   primaryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.3,
+    color: theme.colors.text.light,
+    fontSize: theme.typography.sizes.lg,
+    fontFamily: theme.typography.fonts.bold,
+    letterSpacing: 0.5,
   },
-  guestButton: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 50,
-    height: 52,
+
+  dividerWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: theme.colors.borderLight,
+  },
+  dividerText: {
+    fontSize: theme.typography.sizes.sm,
+    fontFamily: theme.typography.fonts.regular,
+    color: theme.colors.text.tertiary,
+    marginHorizontal: 16,
+  },
+
+  ghostButton: {
+    backgroundColor: theme.colors.lightBg,
+    borderRadius: theme.borderRadius.button,
+    height: 54,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 24,
-    backgroundColor: "#FFFFFF",
   },
-  guestButtonText: {
-    color: "#4B5563",
+  ghostButtonText: {
+    color: theme.colors.secondary,
     fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: theme.typography.fonts.semiBold,
+    letterSpacing: 0.2,
   },
 
-  // Footer
   footer: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
+    marginTop: 10,
   },
   footerText: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: "#6B7280",
+    fontSize: theme.typography.sizes.md,
+    fontFamily: theme.typography.fonts.regular,
+    color: theme.colors.text.secondary,
   },
   footerLink: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    color: BLUE_LIGHT,
+    fontSize: theme.typography.sizes.md,
+    fontFamily: theme.typography.fonts.semiBold,
+    color: theme.colors.secondary,
   },
 });

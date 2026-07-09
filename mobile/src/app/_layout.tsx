@@ -1,18 +1,55 @@
 import { Stack } from "expo-router";
+import { StatusBar } from "react-native";
 import { AuthProvider } from "../context/AuthContext";
+import { useEffect } from "react";
+import { useFonts } from "expo-font";
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from "@expo-google-fonts/inter";
+import * as SplashScreen from "expo-splash-screen";
+import { theme } from "../constants/theme";
+
+SplashScreen.preventAutoHideAsync().catch(() => {
+});
 
 export default function RootLayout() {
+  const [fontsLoaded, error] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  });
+
+  useEffect(() => {
+    if (error) {
+      console.error("[RootLayout] Font loading failed:", error);
+    }
+    if (fontsLoaded || error) {
+      SplashScreen.hideAsync().catch(() => {
+      });
+    }
+  }, [fontsLoaded, error]);
+
+  if (!fontsLoaded && !error) {
+    return null;
+  }
+
   return (
     <AuthProvider>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       <Stack
         screenOptions={{
           headerStyle: {
-            backgroundColor: "#FFFFFF",
+            backgroundColor: theme.colors.cardBackground,
           },
-          headerTintColor: "#208AEF",
+          headerTintColor: theme.colors.headerBlue,
           headerTitleStyle: {
-            fontWeight: "bold",
-            color: "#111827",
+            fontFamily: theme.typography.fonts.bold,
+            color: theme.colors.text.primary,
+            fontSize: theme.typography.sizes.xl,
           },
           headerShadowVisible: false,
         }}
@@ -22,8 +59,9 @@ export default function RootLayout() {
         <Stack.Screen name="detalhes/[id]" options={{ title: "Detalhes" }} />
         <Stack.Screen name="comentarios/[id]" options={{ title: "Comentários" }} />
         <Stack.Screen name="perfil" options={{ title: "Perfil" }} />
-        <Stack.Screen name="localizacao" options={{ title: "Localização" }} />
+        <Stack.Screen name="localizacao" options={{ headerShown: false }} />
       </Stack>
     </AuthProvider>
   );
 }
+

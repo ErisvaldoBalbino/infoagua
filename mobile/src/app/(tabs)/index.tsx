@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -8,42 +8,55 @@ import {
   ActivityIndicator,
   RefreshControl,
   Platform,
+  Animated,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
 import { occurrencesService, OccurrenceResponse } from "../../services/api/occurrences.service";
-import { User, MessageSquare, ThumbsUp, MapPin, Plus } from "lucide-react-native";
-
-const typeLabels: Record<string, string> = {
-  shortage: "Falta de Água",
-  return: "Abastecimento Retornado",
-  quality: "Qualidade da Água",
-  leak: "Vazamento",
-};
-
-const typeColors: Record<string, string> = {
-  shortage: "#EF4444",
-  return: "#10B981",
-  quality: "#F59E0B",
-  leak: "#3B82F6",
-};
+import { theme } from "../../constants/theme";
+import { LinearGradient } from "expo-linear-gradient";
+import { User, Plus, CheckCircle, AlertTriangle } from "lucide-react-native";
+import { ErrorState } from "../../components/ErrorState";
+import { OccurrenceCard } from "../../components/OccurrenceCard";
+import { Button } from "../../components/Button";
 
 export default function HomeTab() {
   const router = useRouter();
   const { isAuthenticated, isLoading: isAuthLoading, user } = useAuth();
   const [occurrences, setOccurrences] = useState<OccurrenceResponse[]>([]);
+
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [hasError, setHasError] = useState(false);
+
+  const [pulseAnim] = useState(() => new Animated.Value(1));
+
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: Platform.OS !== "web",
+        }),
+      ])
+    ).start();
+  }, [pulseAnim]);
 
   useEffect(() => {
     async function fetchOccurrences() {
       try {
         setHasError(false);
         const data = await occurrencesService.findAll();
-        // Sort by newest first
         const sorted = data.sort(
           (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
@@ -64,65 +77,60 @@ export default function HomeTab() {
     setRefreshTrigger((prev) => prev + 1);
   };
 
-  const renderItem = ({ item }: { item: OccurrenceResponse }) => {
-    const formattedDate = new Date(item.createdAt).toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
+  const last24hCount = occurrences.filter(
+    (occ) => new Date().getTime() - new Date(occ.createdAt).getTime() < 24 * 60 * 60 * 1000
+  ).length;
+
+  let statusGradients: [string, string, ...string[]] = [theme.colors.primary, theme.colors.dark];
+  let statusTitle = "Rede Estável";
+  let statusDesc = "Nenhuma ocorrência na sua região!";
+  let statusIconType = "check";
+
+  if (last24hCount > 0 && last24hCount <= 5) {
+    statusGradients = [theme.colors.status.warning, "#B45309"];
+    statusTitle = "Rede sob Atenção";
+    statusDesc = `${last24hCount} relato${last24hCount > 1 ? "s" : ""} de instabilidade nas últimas 24h.`;
+    statusIconType = "alert";
+  } else if (last24hCount > 5) {
+    statusGradients = [theme.colors.status.danger, "#991B1B"];
+    statusTitle = "Rede Instável";
+    statusDesc = `${last24hCount} ocorrências graves registradas nas últimas 24h!`;
+    statusIconType = "critical";
+  }
+
+  const getChartData = () => {
+    const numBars = 18;
+    const data = new Array(numBars).fill(0);
+    const now = new Date().getTime();
+    const timeWindow = 24 * 60 * 60 * 1000;
+
+    occurrences.forEach((occ) => {
+      const diff = now - new Date(occ.createdAt).getTime();
+      if (diff >= 0 && diff < timeWindow) {
+        const ratio = 1 - diff / timeWindow;
+        const index = Math.floor(ratio * (numBars - 1));
+        if (index >= 0 && index < numBars) {
+          data[index] += 1;
+        }
+      }
     });
 
-    const badgeColor = typeColors[item.type] || "#6B7280";
-    const badgeLabel = typeLabels[item.type] || item.type;
+    const maxVal = Math.max(...data);
+    if (maxVal === 0) {
+      return data;
+    }
+    return data;
+  };
 
+  const chartData = getChartData();
+  const maxVal = Math.max(...chartData, 1);
+
+  const renderItem = ({ item }: { item: OccurrenceResponse }) => {
     return (
-      <TouchableOpacity
-        style={styles.card}
-        activeOpacity={0.9}
+      <OccurrenceCard
+        occurrence={item}
         onPress={() => router.push({ pathname: "/detalhes/[id]", params: { id: item.id } })}
-      >
-        <View style={styles.cardHeader}>
-          <View style={styles.authorBadge}>
-            <View style={styles.authorAvatar}>
-              <Text style={styles.authorAvatarText}>
-                {item.user.name ? item.user.name.charAt(0).toUpperCase() : "U"}
-              </Text>
-            </View>
-            <View>
-              <Text style={styles.authorName}>{item.user.name}</Text>
-              <Text style={styles.dateText}>{formattedDate}</Text>
-            </View>
-          </View>
-          <View style={[styles.typeBadge, { backgroundColor: badgeColor + "15" }]}>
-            <Text style={[styles.typeBadgeText, { color: badgeColor }]}>{badgeLabel}</Text>
-          </View>
-        </View>
-
-        {item.description && (
-          <Text style={styles.descriptionText} numberOfLines={3}>
-            {item.description}
-          </Text>
-        )}
-
-        <View style={styles.cardFooter}>
-          <View style={styles.locationContainer}>
-            <MapPin size={16} color="#6B7280" />
-            <Text style={styles.locationText}>{item.city}</Text>
-          </View>
-
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <ThumbsUp size={16} color="#6B7280" />
-              <Text style={styles.statText}>{item.likesCount}</Text>
-            </View>
-            <View style={styles.statItem}>
-              <MessageSquare size={16} color="#6B7280" />
-              <Text style={styles.statText}>{item.commentsCount}</Text>
-            </View>
-          </View>
-        </View>
-      </TouchableOpacity>
+      />
     );
   };
 
@@ -130,51 +138,45 @@ export default function HomeTab() {
     <SafeAreaView style={styles.safeArea}>
       {/* Top Header */}
       <View style={styles.header}>
+        <View style={styles.logoContainer}>
+          <Image
+            source={require("@/assets/images/infoagua-logo.png")}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
+        </View>
         {isAuthLoading ? null : isAuthenticated ? (
-          <TouchableOpacity
-            style={styles.profileButton}
+          <Button
+            title={user?.name?.split(" ")[0] || "Perfil"}
             onPress={() => router.push("/perfil")}
-            activeOpacity={0.8}
-          >
-            <User size={20} color="#208AEF" />
-            <Text style={styles.profileButtonText} numberOfLines={1}>
-              {user?.name?.split(" ")[0]}
-            </Text>
-          </TouchableOpacity>
+            variant="secondary"
+            icon={<User size={18} color={theme.colors.primary} />}
+            style={{ maxWidth: 140 }}
+          />
         ) : (
-          <TouchableOpacity
-            style={styles.loginButton}
+          <Button
+            title="Entrar"
             onPress={() => router.push("/(auth)/login")}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.loginButtonText}>Entrar</Text>
-          </TouchableOpacity>
+            variant="primary"
+            style={{ height: 40, paddingHorizontal: 16, borderRadius: theme.borderRadius.button }}
+          />
         )}
       </View>
 
       {/* Content */}
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#208AEF" />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
       ) : hasError ? (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorEmoji}>⚠️</Text>
-          <Text style={styles.errorTitle}>Falha ao carregar ocorrências</Text>
-          <Text style={styles.errorText}>
-            Não foi possível carregar as ocorrências. Verifique sua conexão ou tente novamente.
-          </Text>
-          <TouchableOpacity
-            style={styles.retryButton}
-            onPress={() => {
-              setIsLoading(true);
-              setRefreshTrigger((prev) => prev + 1);
-            }}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.retryButtonText}>Tentar Novamente</Text>
-          </TouchableOpacity>
-        </View>
+        <ErrorState
+          title="Falha ao carregar ocorrências"
+          message="Não foi possível carregar as ocorrências. Verifique sua conexão ou tente novamente."
+          onRetry={() => {
+            setIsLoading(true);
+            setRefreshTrigger((prev) => prev + 1);
+          }}
+        />
       ) : (
         <FlatList
           data={occurrences}
@@ -186,9 +188,93 @@ export default function HomeTab() {
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={handleRefresh}
-              colors={["#208AEF"]}
-              tintColor="#208AEF"
+              colors={[theme.colors.primary]}
+              tintColor={theme.colors.primary}
             />
+          }
+          ListHeaderComponent={
+            <View style={styles.feedHeader}>
+              {/* 1. Status Card with Gradient */}
+              <LinearGradient
+                colors={statusGradients}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.statusCard}
+              >
+                <View style={styles.statusBadgeSquircle}>
+                  {statusIconType === "check" ? (
+                    <CheckCircle size={28} color={theme.colors.status.success} />
+                  ) : statusIconType === "alert" ? (
+                    <AlertTriangle size={28} color={theme.colors.status.warning} />
+                  ) : (
+                    <AlertTriangle size={28} color={theme.colors.status.danger} />
+                  )}
+                </View>
+
+                <Text style={styles.statusTitle}>{statusTitle}</Text>
+                <Text style={styles.statusDesc}>{statusDesc}</Text>
+
+                <View style={styles.updatePill}>
+                  <Animated.View style={[styles.pulseDot, { opacity: pulseAnim }]} />
+                  <Text style={styles.updatePillText}>Última atualização: Agora</Text>
+                </View>
+              </LinearGradient>
+
+              {/* 2. 24h Reports Chart Card */}
+              <View style={styles.chartCard}>
+                <Text style={styles.chartTitle}>Relatos nas últimas 24h</Text>
+                <View style={styles.chartContainer}>
+                  {chartData.map((val, idx) => {
+                    const heightPct = (val / maxVal) * 100;
+                    const finalHeight = Math.max(heightPct, 6);
+                    const isLast = idx === chartData.length - 1;
+                    const barColor = isLast ? "#1070D0" : "#93C5FD";
+
+                    return (
+                      <View key={idx} style={styles.chartBarWrapper}>
+                        <View
+                          style={[
+                            styles.chartBar,
+                            { height: `${finalHeight}%`, backgroundColor: barColor },
+                          ]}
+                        />
+                      </View>
+                    );
+                  })}
+                </View>
+                <View style={styles.chartLabels}>
+                  <Text style={styles.chartLabelText}>24 horas atrás</Text>
+                  <Text style={styles.chartLabelText}>Agora</Text>
+                </View>
+              </View>
+
+              {/* 3. Section Title */}
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Ocorrências Recentes</Text>
+                <TouchableOpacity
+                  onPress={() => router.push("/(tabs)/mapa")}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.sectionLink}>Ver Mapa</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          }
+          ListFooterComponent={
+            occurrences.length > 0 ? (
+              <View style={styles.ctaCard}>
+                <Text style={styles.ctaTitle}>Viu algo errado?</Text>
+                <Text style={styles.ctaSubtitle}>
+                  Ajude a comunidade relatando problemas em sua rua.
+                </Text>
+                <Button
+                  title="Relatar Ocorrência"
+                  onPress={() => router.push("/(tabs)/relatar")}
+                  variant="cta"
+                  icon={<Plus size={18} color="#FFFFFF" strokeWidth={2.5} />}
+                />
+              </View>
+            ) : null
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
@@ -198,13 +284,13 @@ export default function HomeTab() {
                 Seja o primeiro a relatar um problema de abastecimento ou qualidade da água na sua região!
               </Text>
               {isAuthenticated && (
-                <TouchableOpacity
-                  style={styles.emptyButton}
+                <Button
+                  title="Relatar Agora"
                   onPress={() => router.push("/(tabs)/relatar")}
-                >
-                  <Plus size={18} color="#FFFFFF" />
-                  <Text style={styles.emptyButtonText}>Relatar Agora</Text>
-                </TouchableOpacity>
+                  variant="primary"
+                  icon={<Plus size={18} color="#FFFFFF" />}
+                  style={{ height: 44, paddingHorizontal: 20, borderRadius: 8 }}
+                />
               )}
             </View>
           }
@@ -218,66 +304,42 @@ const cardShadow = Platform.select({
   web: { boxShadow: "0px 4px 12px rgba(0,0,0,0.05)" } as any,
   default: {
     shadowColor: "#000",
-    shadowOpacity: 0.03,
+    shadowOpacity: 0.04,
     shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
   },
 });
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: theme.colors.background,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: "#FFFFFF",
+    paddingVertical: 14,
+    backgroundColor: theme.colors.cardBackground,
     borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
+    borderBottomColor: theme.colors.borderLight,
   },
   logoContainer: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-  logoEmoji: {
-    fontSize: 24,
+  logoImage: {
+    width: 32,
+    height: 32,
   },
   appName: {
-    fontSize: 20,
+    fontSize: theme.typography.sizes.xxl,
     fontWeight: "bold",
-    color: "#1F2937",
-  },
-  profileButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#EFF6FF",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    gap: 6,
-    maxWidth: 140,
-  },
-  profileButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#208AEF",
-  },
-  loginButton: {
-    backgroundColor: "#208AEF",
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-  },
-  loginButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#FFFFFF",
+    fontFamily: theme.typography.fonts.bold,
+    color: theme.colors.text.primary,
   },
   loadingContainer: {
     flex: 1,
@@ -286,95 +348,158 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 16,
-    gap: 16,
+    paddingBottom: 110,
+    gap: 12,
     flexGrow: 1,
   },
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
+  feedHeader: {
+    gap: 16,
+    marginBottom: 4,
+  },
+  statusCard: {
+    borderRadius: theme.borderRadius.sheet,
+    padding: 24,
+    alignItems: "center",
+    justifyContent: "center",
     ...cardShadow,
   },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 12,
-  },
-  authorBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  authorAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#E5E7EB",
+  statusBadgeSquircle: {
+    width: 56,
+    height: 56,
+    borderRadius: theme.borderRadius.squircle,
+    backgroundColor: theme.colors.cardBackground,
     justifyContent: "center",
     alignItems: "center",
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
-  authorAvatarText: {
-    fontSize: 16,
+  statusTitle: {
+    fontSize: theme.typography.sizes.display,
     fontWeight: "bold",
-    color: "#4B5563",
+    fontFamily: theme.typography.fonts.bold,
+    color: theme.colors.text.light,
+    marginBottom: 6,
+    textAlign: "center",
   },
-  authorName: {
-    fontSize: 14,
+  statusDesc: {
+    fontSize: theme.typography.sizes.lg,
+    fontFamily: theme.typography.fonts.regular,
+    color: "rgba(255, 255, 255, 0.9)",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  updatePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+  },
+  pulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.status.success,
+    marginRight: 8,
+  },
+  updatePillText: {
+    color: theme.colors.text.light,
+    fontSize: theme.typography.sizes.sm,
     fontWeight: "600",
-    color: "#1F2937",
+    fontFamily: theme.typography.fonts.semiBold,
   },
-  dateText: {
-    fontSize: 11,
-    color: "#9CA3AF",
+  chartCard: {
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: theme.borderRadius.sheet,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: theme.colors.borderLight,
+    ...cardShadow,
   },
-  typeBadge: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-  },
-  typeBadgeText: {
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  descriptionText: {
-    fontSize: 14,
-    color: "#4B5563",
-    lineHeight: 20,
+  chartTitle: {
+    fontSize: theme.typography.sizes.xl,
+    fontWeight: "bold",
+    fontFamily: theme.typography.fonts.bold,
+    color: theme.colors.text.primary,
     marginBottom: 16,
   },
-  cardFooter: {
+  chartContainer: {
+    flexDirection: "row",
+    height: 90,
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    paddingVertical: 4,
+  },
+  chartBarWrapper: {
+    flex: 1,
+    height: "100%",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    marginHorizontal: 1.5,
+  },
+  chartBar: {
+    width: "100%",
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+  },
+  chartLabels: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
+  chartLabelText: {
+    fontSize: 12,
+    color: theme.colors.text.tertiary,
+    fontWeight: "500",
+    fontFamily: theme.typography.fonts.medium,
+  },
+  sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    borderTopWidth: 1,
-    borderTopColor: "#F3F4F6",
-    paddingTop: 12,
+    marginTop: 8,
+    marginBottom: 4,
   },
-  locationContainer: {
-    flexDirection: "row",
+  sectionTitle: {
+    fontSize: theme.typography.sizes.xxl,
+    fontWeight: "bold",
+    fontFamily: theme.typography.fonts.bold,
+    color: theme.colors.text.primary,
+  },
+  sectionLink: {
+    fontSize: theme.typography.sizes.lg,
+    fontWeight: "600",
+    fontFamily: theme.typography.fonts.semiBold,
+    color: theme.colors.primary,
+  },
+  ctaCard: {
+    backgroundColor: theme.colors.lightBg,
+    borderRadius: theme.borderRadius.sheet,
+    padding: 20,
     alignItems: "center",
-    gap: 4,
+    marginTop: 16,
   },
-  locationText: {
-    fontSize: 13,
-    color: "#6B7280",
-    fontWeight: "500",
+  ctaTitle: {
+    fontSize: theme.typography.sizes.xxl,
+    fontWeight: "bold",
+    fontFamily: theme.typography.fonts.bold,
+    color: theme.colors.dark,
+    marginBottom: 6,
+    textAlign: "center",
   },
-  statsContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-  },
-  statItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  statText: {
-    fontSize: 13,
-    color: "#6B7280",
-    fontWeight: "500",
+  ctaSubtitle: {
+    fontSize: theme.typography.sizes.base,
+    color: theme.colors.secondary,
+    fontFamily: theme.typography.fonts.regular,
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 16,
+    paddingHorizontal: 12,
   },
   emptyContainer: {
     flex: 1,
@@ -388,67 +513,21 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: theme.typography.sizes.xxl,
     fontWeight: "bold",
-    color: "#374151",
+    fontFamily: theme.typography.fonts.bold,
+    color: theme.colors.text.primary,
     marginBottom: 8,
     textAlign: "center",
   },
   emptyText: {
-    fontSize: 14,
-    color: "#6B7280",
+    fontSize: theme.typography.sizes.lg,
+    color: theme.colors.text.secondary,
+    fontFamily: theme.typography.fonts.regular,
     textAlign: "center",
-    lineHeight: 20,
+    lineHeight: 22,
     marginBottom: 24,
-  },
-  emptyButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#208AEF",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    gap: 8,
-  },
-  emptyButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 32,
-    paddingVertical: 64,
-  },
-  errorEmoji: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  errorTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#EF4444",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  errorText: {
-    fontSize: 14,
-    color: "#6B7280",
-    textAlign: "center",
-    lineHeight: 20,
-    marginBottom: 24,
-  },
-  retryButton: {
-    backgroundColor: "#208AEF",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "600",
   },
 });
+
+

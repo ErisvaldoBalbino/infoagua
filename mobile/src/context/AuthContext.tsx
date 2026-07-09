@@ -44,13 +44,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const savedToken = await storage.getItem(TOKEN_KEY);
         if (savedToken) {
           setToken(savedToken);
-          const me = await authService.me();
-          setUser(me);
+          try {
+            const me = await authService.me();
+            setUser(me);
+          } catch (error: any) {
+            console.error("Erro ao carregar dados do usuário na inicialização:", error);
+            // Se for um erro 401 (Não Autorizado), limpa a sessão.
+            // Para outros erros (ex: rede offline), mantemos o token para permitir que o usuário continue offline/tente novamente.
+            if (error.response?.status === 401) {
+              await storage.deleteItem(TOKEN_KEY);
+              setToken(null);
+              setUser(null);
+            }
+          }
         }
-      } catch {
-        await storage.deleteItem(TOKEN_KEY);
-        setToken(null);
-        setUser(null);
+      } catch (error) {
+        console.error("Erro ao recuperar o token do storage:", error);
       } finally {
         setIsLoading(false);
       }
@@ -73,9 +82,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    await storage.deleteItem(TOKEN_KEY);
-    setToken(null);
-    setUser(null);
+    try {
+      await storage.deleteItem(TOKEN_KEY);
+    } finally {
+      setToken(null);
+      setUser(null);
+    }
   }, []);
 
   return (

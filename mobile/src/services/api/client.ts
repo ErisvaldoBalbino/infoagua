@@ -1,4 +1,4 @@
-import axios from "axios";
+import { create } from "axios";
 import { Platform } from "react-native";
 import { storage } from "../storage";
 
@@ -21,7 +21,7 @@ function resolveBaseUrl(): string {
 
 const BASE_URL = resolveBaseUrl();
 
-export const api = axios.create({
+export const api = create({
   baseURL: BASE_URL,
   timeout: 10_000,
   headers: {
