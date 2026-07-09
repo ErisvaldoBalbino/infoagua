@@ -1,5 +1,6 @@
-import React, { ReactNode } from "react";
+import { ReactNode } from "react";
 import { StyleSheet, Text, TouchableOpacity, View, Platform, StyleProp, ViewStyle } from "react-native";
+import { theme } from "../constants/theme";
 
 export interface ActionButtonProps {
   icon: ReactNode;
@@ -44,9 +45,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     height: 56,
     borderWidth: 1,
-    borderColor: "#CBD5E1",
+    borderColor: theme.colors.border,
     borderRadius: 28,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.colors.cardBackground,
     gap: 10,
     paddingHorizontal: 12,
     ...Platform.select({
@@ -69,16 +70,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   actionButtonCount: {
-    fontSize: 15,
+    fontSize: theme.typography.sizes.base,
     fontWeight: "700",
-    color: "#1E293B",
-    fontFamily: "Inter_700Bold",
+    color: theme.colors.text.primary,
+    fontFamily: theme.typography.fonts.bold,
   },
   actionButtonLabel: {
-    fontSize: 11,
+    fontSize: theme.typography.sizes.xs,
     fontWeight: "500",
-    color: "#64748B",
-    fontFamily: "Inter_500Medium",
+    color: theme.colors.text.secondary,
+    fontFamily: theme.typography.fonts.medium,
     marginTop: 1,
   },
 });

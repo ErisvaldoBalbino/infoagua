@@ -55,13 +55,8 @@ export default function ProfileScreen() {
       return;
     }
     try {
-      const data = await occurrencesService.findAll();
-      const myOccurrences = data.filter((occ) => occ.user.id === user.id);
-      const totalConfirmations = myOccurrences.reduce((acc, curr) => acc + (curr.likesCount || 0), 0);
-      setStats({
-        reports: myOccurrences.length,
-        confirmations: totalConfirmations,
-      });
+      const statsData = await occurrencesService.getUserStats();
+      setStats(statsData);
     } catch (error) {
       console.error("Error fetching profile stats:", error);
     } finally {

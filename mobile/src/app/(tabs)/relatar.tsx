@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -34,11 +34,19 @@ export default function ReportTab() {
   const { isAuthenticated, isLoading } = useAuth();
   const insets = useSafeAreaInsets();
 
-  const address = String(params.address || "Boa Viagem, Recife");
-  const details = String(params.details || "Av. Boa Viagem, 1234");
-  const latitude = Number(params.latitude || -8.1156);
-  const longitude = Number(params.longitude || -34.8924);
-  const city = String(params.city || "Recife");
+  const isLocationSelected = !!params.latitude && !!params.longitude;
+
+  const address = String(params.address || "Selecione uma localização");
+  const details = String(params.details || "Toque no card para selecionar");
+  const latitude = params.latitude ? Number(params.latitude) : 0;
+  const longitude = params.longitude ? Number(params.longitude) : 0;
+  const city = String(params.city || "");
+
+  useEffect(() => {
+    if (isAuthenticated && !isLocationSelected) {
+      router.replace("/localizacao");
+    }
+  }, [isAuthenticated, isLocationSelected, router]);
 
   const [selectedCategory, setSelectedCategory] = useState<OccurrenceType>("shortage");
   const [description, setDescription] = useState("");
@@ -65,6 +73,7 @@ export default function ReportTab() {
   };
 
   const handleSend = async () => {
+    if (!isLocationSelected) return;
     setIsSubmitting(true);
     try {
       await occurrencesService.create({
@@ -75,22 +84,14 @@ export default function ReportTab() {
         description,
       });
 
-      if (Platform.OS === "web") {
-        alert("Ocorrência enviada com sucesso!");
-      } else {
-        Alert.alert("Sucesso", "Ocorrência enviada com sucesso!");
-      }
+      Alert.alert("Sucesso", "Ocorrência enviada com sucesso!");
 
       setDescription("");
       router.push("/(tabs)/mapa");
     } catch (error: any) {
       console.error("Erro ao enviar ocorrência:", error);
       const errorMsg = error?.response?.data?.message || "Não foi possível enviar a ocorrência no momento.";
-      if (Platform.OS === "web") {
-        alert("Erro: " + errorMsg);
-      } else {
-        Alert.alert("Erro ao enviar", errorMsg);
-      }
+      Alert.alert("Erro ao enviar", errorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -226,6 +227,7 @@ export default function ReportTab() {
         onPress={handleSend}
         variant="primary"
         loading={isSubmitting}
+        disabled={!isLocationSelected}
       />
     </ScrollView>
   );

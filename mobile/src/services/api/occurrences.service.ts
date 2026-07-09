@@ -91,4 +91,9 @@ export const occurrencesService = {
     api
       .post<LikeToggleResult>(`/occurrences/${id}/like`)
       .then((r) => r.data),
+
+  getUserStats: () =>
+    api
+      .get<{ reports: number; confirmations: number }>("/users/me/stats")
+      .then((r) => r.data),
 };

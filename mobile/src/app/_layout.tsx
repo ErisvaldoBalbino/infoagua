@@ -24,6 +24,9 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
+    if (error) {
+      console.error("[RootLayout] Font loading failed:", error);
+    }
     if (fontsLoaded || error) {
       SplashScreen.hideAsync().catch(() => {
       });

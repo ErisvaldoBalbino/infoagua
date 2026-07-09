@@ -39,7 +39,7 @@ export default function TabLayout() {
           tabBarLabel: () => null,
           tabBarIcon: ({ focused }) => (
             <View style={[styles.centerButton, focused && styles.activeCenterButton]}>
-              <Plus size={28} color="#FFFFFF" strokeWidth={3} />
+              <Plus size={28} color={theme.colors.text.light} strokeWidth={3} />
             </View>
           ),
         }}

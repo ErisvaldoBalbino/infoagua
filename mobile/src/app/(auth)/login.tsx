@@ -1,7 +1,6 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -14,10 +13,10 @@ import {
 import { useRouter } from "expo-router";
 import { Eye, EyeOff, Lock, Mail, AlertCircle } from "lucide-react-native";
 import { theme } from "../../constants/theme";
-import { LinearGradient } from "expo-linear-gradient";
-import Svg, { Path } from "react-native-svg";
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { useAuth } from "../../context/AuthContext";
+import { AuthHeader } from "../../components/AuthHeader";
+import { useButtonScale } from "../../hooks/useButtonScale";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -35,19 +34,8 @@ export default function LoginScreen() {
   const [passwordError, setPasswordError] = useState("");
   const [generalError, setGeneralError] = useState("");
 
-  const primaryButtonScale = useSharedValue(1);
-  const guestButtonScale = useSharedValue(1);
-
-  const primaryButtonScaleRef = useRef(primaryButtonScale);
-  const guestButtonScaleRef = useRef(guestButtonScale);
-
-  const animatedPrimaryButtonStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: primaryButtonScale.value }],
-  }));
-
-  const animatedGuestButtonStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: guestButtonScale.value }],
-  }));
+  const primaryButton = useButtonScale();
+  const guestButton = useButtonScale();
 
   async function handleLogin() {
     if (isLoading) return;
@@ -103,36 +91,7 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Top Wavy Header */}
-          <LinearGradient
-            colors={["#1A3F6F", "#1A6FBB"]}
-            style={styles.headerGradient}
-          >
-            <View style={styles.logoWrapper}>
-              <Image
-                source={require("@/assets/images/infoagua-logo.png")}
-                style={styles.logoImage}
-                resizeMode="contain"
-              />
-              <Text style={styles.appName}>InfoÁgua</Text>
-            </View>
-          </LinearGradient>
-
-          {/* SVG Wave Transition */}
-          <View style={styles.waveContainer}>
-            <Svg
-              height="60"
-              width="100%"
-              viewBox="0 0 1440 320"
-              preserveAspectRatio="none"
-              style={styles.waveSvg}
-            >
-              <Path
-                fill="#1A6FBB"
-                d="M0,96L120,112C240,128,480,160,720,160C960,160,1200,128,1320,112L1440,96L1440,0L1320,0C1200,0,960,0,720,0C480,0,240,0,120,0L0,0Z"
-              />
-            </Svg>
-          </View>
+          <AuthHeader />
 
           {/* Form Content Area */}
           <View style={styles.formContainer}>
@@ -156,13 +115,13 @@ export default function LoginScreen() {
             ]}>
               <Mail
                 size={18}
-                color={emailError ? theme.colors.status.danger : (isEmailFocused ? "#208AEF" : "#9CA3AF")}
+                color={emailError ? theme.colors.status.danger : (isEmailFocused ? theme.colors.secondary : theme.colors.text.tertiary)}
                 style={styles.inputIcon}
               />
               <TextInput
                 style={styles.input}
                 placeholder="Digite seu e-mail"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={theme.colors.text.tertiary}
                 value={email}
                 onChangeText={(text) => {
                   setEmail(text);
@@ -191,13 +150,13 @@ export default function LoginScreen() {
             ]}>
               <Lock
                 size={18}
-                color={passwordError ? theme.colors.status.danger : (isPasswordFocused ? "#208AEF" : "#9CA3AF")}
+                color={passwordError ? theme.colors.status.danger : (isPasswordFocused ? theme.colors.secondary : theme.colors.text.tertiary)}
                 style={styles.inputIcon}
               />
               <TextInput
                 style={[styles.input, styles.inputPassword]}
                 placeholder="Digite sua senha"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={theme.colors.text.tertiary}
                 value={password}
                 onChangeText={(text) => {
                   setPassword(text);
@@ -216,9 +175,9 @@ export default function LoginScreen() {
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 {showPassword ? (
-                  <EyeOff size={18} color={passwordError ? theme.colors.status.danger : (isPasswordFocused ? "#208AEF" : "#9CA3AF")} />
+                  <EyeOff size={18} color={passwordError ? theme.colors.status.danger : (isPasswordFocused ? theme.colors.secondary : theme.colors.text.tertiary)} />
                 ) : (
-                  <Eye size={18} color={passwordError ? theme.colors.status.danger : (isPasswordFocused ? "#208AEF" : "#9CA3AF")} />
+                  <Eye size={18} color={passwordError ? theme.colors.status.danger : (isPasswordFocused ? theme.colors.secondary : theme.colors.text.tertiary)} />
                 )}
               </TouchableOpacity>
             </View>
@@ -227,17 +186,17 @@ export default function LoginScreen() {
             )}
 
             {/* Botão entrar */}
-            <Animated.View style={animatedPrimaryButtonStyle}>
+            <Animated.View style={primaryButton.animatedStyle}>
               <TouchableOpacity
                 style={[styles.primaryButton, isLoading && styles.primaryButtonDisabled]}
                 onPress={handleLogin}
-                onPressIn={() => { primaryButtonScaleRef.current.value = withSpring(0.96); }}
-                onPressOut={() => { primaryButtonScaleRef.current.value = withSpring(1); }}
+                onPressIn={primaryButton.onPressIn}
+                onPressOut={primaryButton.onPressOut}
                 disabled={isLoading}
                 activeOpacity={0.85}
               >
                 {isLoading ? (
-                  <ActivityIndicator color="#FFFFFF" />
+                  <ActivityIndicator color={theme.colors.text.light} />
                 ) : (
                   <Text style={styles.primaryButtonText}>Entrar</Text>
                 )}
@@ -252,12 +211,12 @@ export default function LoginScreen() {
             </View>
 
             {/* Botão visitante */}
-            <Animated.View style={animatedGuestButtonStyle}>
+            <Animated.View style={guestButton.animatedStyle}>
               <TouchableOpacity
                 style={styles.ghostButton}
                 onPress={() => router.replace("/(tabs)")}
-                onPressIn={() => { guestButtonScaleRef.current.value = withSpring(0.96); }}
-                onPressOut={() => { guestButtonScaleRef.current.value = withSpring(1); }}
+                onPressIn={guestButton.onPressIn}
+                onPressOut={guestButton.onPressOut}
                 activeOpacity={0.75}
               >
                 <Text style={styles.ghostButtonText}>Entrar como visitante</Text>
@@ -281,51 +240,19 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.colors.cardBackground,
   },
   flex: { flex: 1 },
   scroll: {
     flexGrow: 1,
-    backgroundColor: "#FFFFFF",
-  },
-
-  headerGradient: {
-    width: "100%",
-    paddingTop: Platform.OS === "ios" ? 70 : 50,
-    paddingBottom: 10,
-    alignItems: "center",
-  },
-  logoWrapper: {
-    alignItems: "center",
-  },
-  logoImage: {
-    width: 80,
-    height: 80,
-  },
-  appName: {
-    fontSize: 28,
-    fontFamily: "Inter_700Bold",
-    color: "#FFFFFF",
-    marginTop: 10,
-    letterSpacing: 0.5,
-  },
-
-  waveContainer: {
-    width: "100%",
-    height: 45,
-    backgroundColor: "#FFFFFF",
-    marginTop: -1,
-  },
-  waveSvg: {
-    width: "100%",
-    height: "100%",
+    backgroundColor: theme.colors.cardBackground,
   },
 
   formContainer: {
     flex: 1,
     paddingHorizontal: 28,
     paddingBottom: 40,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.colors.cardBackground,
   },
   screenTitle: {
     fontSize: theme.typography.sizes.display,

@@ -23,6 +23,7 @@ export const storage = {
       await SecureStore.setItemAsync(key, value);
     } catch (error) {
       console.error(`[Storage] Error writing key "${key}":`, error);
+      throw error;
     }
   },
 
@@ -35,6 +36,7 @@ export const storage = {
       await SecureStore.deleteItemAsync(key);
     } catch (error) {
       console.error(`[Storage] Error deleting key "${key}":`, error);
+      throw error;
     }
   },
 };

@@ -1,4 +1,4 @@
-import React, { ReactNode } from "react";
+import { ReactNode } from "react";
 import {
   StyleSheet,
   Text,
@@ -50,7 +50,7 @@ export function Button({
       activeOpacity={activeOpacity}
     >
       {loading ? (
-        <ActivityIndicator size="small" color={variant === "outline" ? "#1070D0" : "#FFFFFF"} />
+        <ActivityIndicator size="small" color={variant === "outline" ? theme.colors.primary : "#FFFFFF"} />
       ) : (
         <View style={styles.contentContainer}>
           {icon && <View style={styles.iconContainer}>{icon}</View>}

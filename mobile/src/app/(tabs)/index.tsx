@@ -117,7 +117,7 @@ export default function HomeTab() {
 
     const maxVal = Math.max(...data);
     if (maxVal === 0) {
-      return [3, 5, 2, 4, 8, 12, 18, 10, 6, 4, 8, 14, 20, 15, 12, 17, 13, 22];
+      return data;
     }
     return data;
   };

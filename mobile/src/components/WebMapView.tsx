@@ -8,6 +8,14 @@ import {
 
 const API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
+if (!API_KEY) {
+  console.warn(
+    "[WebMapView] Warning: EXPO_PUBLIC_GOOGLE_MAPS_API_KEY is missing! " +
+    "Google Maps features will fail to load. Please configure it in your environment variables. " +
+    "Make sure this key is restricted to HTTP referrers and authorized only for the required Google Maps APIs."
+  );
+}
+
 const mapStyle = [
   { elementType: "geometry", stylers: [{ color: "#f1f5f9" }] },
   { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
@@ -160,7 +168,7 @@ interface WebLocationMapProps {
 }
 
 export function WebLocationMap({ lat, lng, onMapPress, centerLat, centerLng }: WebLocationMapProps) {
-  const { isLoaded } = useJsApiLoader({
+  const { isLoaded, loadError } = useJsApiLoader({
     id: "google-map-script",
     googleMapsApiKey: API_KEY,
   });
@@ -176,6 +184,14 @@ export function WebLocationMap({ lat, lng, onMapPress, centerLat, centerLng }: W
       map.panTo({ lat: centerLat, lng: centerLng });
     }
   }, [map, centerLat, centerLng]);
+
+  if (loadError) {
+    return (
+      <View style={styles.errorContainer}>
+        <View style={styles.errorBox} />
+      </View>
+    );
+  }
 
   if (!isLoaded) return <View style={styles.loadingContainer} />;
 

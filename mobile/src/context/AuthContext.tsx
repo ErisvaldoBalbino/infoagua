@@ -84,8 +84,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     try {
       await storage.deleteItem(TOKEN_KEY);
-    } catch (error) {
-      console.error("Erro ao deletar o token do storage durante logout:", error);
     } finally {
       setToken(null);
       setUser(null);

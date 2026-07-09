@@ -26,6 +26,18 @@ import { UsersService } from './users.service';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  @Get('me/stats')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  @ApiOperation({ summary: 'Estatísticas do próprio usuário' })
+  @ApiResponse({ status: 200, description: 'Estatísticas do usuário' })
+  @ApiResponse({ status: 401, description: 'Token ausente ou inválido' })
+  getMyStats(
+    @CurrentUser() user: JwtPayload,
+  ): Promise<{ reports: number; confirmations: number }> {
+    return this.usersService.getMyStats(user.sub);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Perfil público de um usuário' })
   @ApiResponse({ status: 200, type: PublicProfileDto })

@@ -40,5 +40,6 @@ export function formatTimeAgo(dateString: string): string {
   if (diffMin < 1) return "Agora mesmo";
   if (diffMin < 60) return `Há ${diffMin} min`;
   if (diffHours < 24) return `Há ${diffHours} h`;
+  if (diffDays === 1) return "Há 1 dia";
   return `Há ${diffDays} dias`;
 }
