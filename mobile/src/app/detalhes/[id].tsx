@@ -31,6 +31,7 @@ import {
   typeIcons,
   formatTimeAgo,
 } from "../../utils/occurrence-utils";
+import { reverseGeocode } from "../../utils/location";
 
 let WebLocationMap: any = null;
 if (Platform.OS === "web") {
@@ -52,82 +53,6 @@ if (Platform.OS !== "web") {
   } catch (e) {
     console.warn("Failed to load react-native-maps. Running in Web fallback mode.", e);
   }
-}
-
-interface AddressData {
-  address: string;
-  details: string;
-  city: string;
-  lat: number;
-  lng: number;
-}
-
-const mockAddresses: AddressData[] = [
-  {
-    address: "Av. Boa Viagem, 1234",
-    details: "Boa Viagem, Recife - PE",
-    city: "Recife",
-    lat: -8.1156,
-    lng: -34.8924,
-  },
-  {
-    address: "Rua do Hospício, 200",
-    details: "Boa Vista, Recife - PE",
-    city: "Recife",
-    lat: -8.0585,
-    lng: -34.8845,
-  },
-  {
-    address: "Rua da Moeda, 50",
-    details: "Bairro do Recife, Recife - PE",
-    city: "Recife",
-    lat: -8.0632,
-    lng: -34.8711,
-  },
-  {
-    address: "Av. Agamenon Magalhães, 2990",
-    details: "Espinheiro, Recife - PE",
-    city: "Recife",
-    lat: -8.0495,
-    lng: -34.8961,
-  },
-  {
-    address: "Rua Amélia, 450",
-    details: "Graças, Recife - PE",
-    city: "Recife",
-    lat: -8.0425,
-    lng: -34.9015,
-  },
-  {
-    address: "Estrada do Encanamento, 800",
-    details: "Casa Forte, Recife - PE",
-    city: "Recife",
-    lat: -8.0315,
-    lng: -34.9180,
-  },
-];
-
-// Constants and date helpers are now managed by utils/occurrence-utils.
-
-function getAddressFromCoordinates(lat: number, lng: number, city: string) {
-  const threshold = 0.01;
-  const closest = mockAddresses.find(
-    (addr) =>
-      Math.abs(addr.lat - lat) < threshold &&
-      Math.abs(addr.lng - lng) < threshold
-  );
-
-  if (closest) {
-    return {
-      address: closest.address,
-      details: closest.details,
-    };
-  }
-
-  return {
-    address: `Ponto próximo a lat/lng: ${lat.toFixed(4)}, ${lng.toFixed(4)}`,
-    details: `${city}`,
-  };
 }
 
 const mapStyle = [
@@ -231,8 +156,10 @@ export default function DetailsScreen() {
   const [hasError, setHasError] = useState(false);
   const [retryTrigger, setRetryTrigger] = useState(0);
   const [isLiking, setIsLiking] = useState(false);
-
-
+  const [addressInfo, setAddressInfo] = useState<{ address: string; details: string }>({
+    address: "Carregando endereço...",
+    details: "",
+  });
 
   useEffect(() => {
     async function loadDetails() {
@@ -242,6 +169,20 @@ export default function DetailsScreen() {
           const data = await occurrencesService.findById(id);
           setOccurrence(data);
           setLikesCount(data.likesCount);
+
+          try {
+            const resolved = await reverseGeocode(Number(data.latitude), Number(data.longitude));
+            setAddressInfo({
+              address: resolved.address,
+              details: resolved.details,
+            });
+          } catch (e) {
+            console.warn("Reverse geocoding failed in details screen:", e);
+            setAddressInfo({
+              address: `Ponto próximo a lat/lng: ${Number(data.latitude).toFixed(4)}, ${Number(data.longitude).toFixed(4)}`,
+              details: data.city,
+            });
+          }
         }
       } catch (error) {
         console.error("Error loading occurrence details:", error);
@@ -331,12 +272,6 @@ export default function DetailsScreen() {
   const badgeColor = typeColors[occurrence.type] || "#6B7280";
   const badgeLabel = typeLabels[occurrence.type] || occurrence.type;
   const IconComponent = typeIcons[occurrence.type] || AlertTriangle;
-
-  const addressInfo = getAddressFromCoordinates(
-    Number(occurrence.latitude),
-    Number(occurrence.longitude),
-    occurrence.city
-  );
 
   return (
     <View style={styles.container}>

@@ -1,17 +1,24 @@
+import { useState, useEffect } from "react";
 import {
   StyleSheet,
   Text,
   View,
   ScrollView,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { theme } from "../../constants/theme";
 import { CloudRain, Droplet, Cloud, CloudSun, Sun } from "lucide-react-native";
+import * as Location from "expo-location";
+import { weatherService, WeatherResponse } from "../../services/api/weather.service";
+import { reverseGeocode, requestLocationPermissions } from "../../utils/location";
 
 export default function WeatherTab() {
-
+  const [weather, setWeather] = useState<WeatherResponse | null>(null);
+  const [cityName, setCityName] = useState("Carregando...");
+  const [isLoading, setIsLoading] = useState(true);
 
   const forecastData = [
     {
@@ -56,12 +63,79 @@ export default function WeatherTab() {
     },
   ];
 
+  useEffect(() => {
+    async function loadWeatherData() {
+      try {
+        setIsLoading(true);
+        const hasPermission = await requestLocationPermissions();
+        let lat = -8.1156;
+        let lon = -34.8924;
+
+        if (hasPermission) {
+          const loc = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          lat = loc.coords.latitude;
+          lon = loc.coords.longitude;
+        }
+
+        try {
+          const addressInfo = await reverseGeocode(lat, lon);
+          setCityName(addressInfo.city || "Sua Região");
+        } catch (e) {
+          console.warn("Reverse geocoding failed for weather:", e);
+          setCityName("Sua Região");
+        }
+
+        const data = await weatherService.getForecast(lat, lon);
+        setWeather(data);
+      } catch (error) {
+        console.error("Error loading weather forecast:", error);
+        setWeather({
+          temperature: 26,
+          description: "Chuva fraca",
+          rainProbability: 0.8,
+          icon: "10d",
+          datetime: new Date().toISOString()
+        });
+        setCityName("Recife");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadWeatherData();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={{ marginTop: 12, color: theme.colors.text.secondary, fontFamily: theme.typography.fonts.medium }}>
+            Obtendo previsão do tempo...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const capitalizedDescription = weather
+    ? weather.description.charAt(0).toUpperCase() + weather.description.slice(1)
+    : "Chuva";
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContainer}
       >
+        {/* City Location Header */}
+        <View style={styles.locationHeader}>
+          <Text style={styles.locationTitle}>PREVISÃO PARA</Text>
+          <Text style={styles.locationCity}>{cityName}</Text>
+        </View>
+
         {/* Top Weather Card */}
         <LinearGradient
           colors={[theme.colors.primary, theme.colors.dark]}
@@ -71,11 +145,13 @@ export default function WeatherTab() {
         >
           <View style={styles.weatherHeader}>
             <CloudRain size={32} color="#FFFFFF" />
-            <Text style={styles.weatherStatus}>Chuva Forte</Text>
+            <Text style={styles.weatherStatus}>{capitalizedDescription}</Text>
           </View>
 
           <View style={styles.chanceContainer}>
-            <Text style={styles.chanceNumber}>80%</Text>
+            <Text style={styles.chanceNumber}>
+              {weather ? Math.round(weather.rainProbability * 100) : 80}%
+            </Text>
             <Text style={styles.chanceLabel}>chance</Text>
           </View>
 
@@ -89,7 +165,9 @@ export default function WeatherTab() {
             <View style={styles.statDivider} />
             <View style={styles.statBox}>
               <Text style={styles.statLabel}>TEMP</Text>
-              <Text style={styles.statValue}>26°C</Text>
+              <Text style={styles.statValue}>
+                {weather ? Math.round(weather.temperature) : 26}°C
+              </Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statBox}>
@@ -155,6 +233,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: theme.colors.background,
+  },
+  locationHeader: {
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  locationTitle: {
+    fontSize: 11,
+    fontFamily: theme.typography.fonts.bold,
+    color: theme.colors.text.secondary,
+    letterSpacing: 0.8,
+  },
+  locationCity: {
+    fontSize: theme.typography.sizes.xxxl,
+    fontFamily: theme.typography.fonts.bold,
+    color: theme.colors.text.primary,
+    marginTop: 2,
   },
   scrollContainer: {
     padding: 16,

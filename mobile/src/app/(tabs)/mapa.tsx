@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -19,6 +19,10 @@ import {
 } from "lucide-react-native";
 import { OccurrenceBottomSheet } from "../../components/OccurrenceBottomSheet";
 import { theme } from "../../constants/theme";
+import { occurrencesService, OccurrenceMapPin } from "../../services/api/occurrences.service";
+import { reverseGeocode, geocode } from "../../utils/location";
+import { formatTimeAgo } from "../../utils/occurrence-utils";
+import { Alert } from "../../utils/alert";
 
 let WebMapView: any = null;
 if (Platform.OS === "web") {
@@ -42,9 +46,7 @@ if (Platform.OS !== "web") {
   }
 }
 
-// Dimensions and Animated are now handled inside the components.
-
-interface Occurrence {
+interface OccurrenceDetail {
   id: string;
   type: "shortage" | "leak" | "quality" | "return";
   title: string;
@@ -56,117 +58,7 @@ interface Occurrence {
   commentsCount: number;
   latitude: number;
   longitude: number;
-  webX: number;
-  webY: number;
 }
-
-const mockOccurrences: Occurrence[] = [
-  {
-    id: "1",
-    type: "shortage",
-    title: "Falta D'Água",
-    description: "Sem água desde ontem de manhã na rua inteira.",
-    address: "Rua Marquês de Abrantes, Flamengo",
-    city: "Rio de Janeiro",
-    timeAgo: "Há 45 min",
-    likesCount: 15,
-    commentsCount: 6,
-    latitude: -22.9284,
-    longitude: -43.1780,
-    webX: 62,
-    webY: 22,
-  },
-  {
-    id: "2",
-    type: "shortage",
-    title: "Falta D'Água",
-    description: "Pressão fraca e depois cortou por completo.",
-    address: "Rua Senador Vergueiro, Flamengo",
-    city: "Rio de Janeiro",
-    timeAgo: "Há 2 h",
-    likesCount: 8,
-    commentsCount: 2,
-    latitude: -22.9340,
-    longitude: -43.1790,
-    webX: 22,
-    webY: 33,
-  },
-  {
-    id: "3",
-    type: "shortage",
-    title: "Falta D'Água",
-    description: "Abastecimento suspenso para manutenção programada.",
-    address: "Avenida Rui Barbosa, Flamengo",
-    city: "Rio de Janeiro",
-    timeAgo: "Há 4 h",
-    likesCount: 11,
-    commentsCount: 3,
-    latitude: -22.9375,
-    longitude: -43.1730,
-    webX: 72,
-    webY: 41,
-  },
-  {
-    id: "4",
-    type: "leak",
-    title: "Vazamento",
-    description: "Cano estourado na calçada, jorrando muita água limpa.",
-    address: "Avenida Oswaldo Cruz, Botafogo",
-    city: "Rio de Janeiro",
-    timeAgo: "Há 1 h",
-    likesCount: 24,
-    commentsCount: 9,
-    latitude: -22.9435,
-    longitude: -43.1785,
-    webX: 38,
-    webY: 49,
-  },
-  {
-    id: "5",
-    type: "quality",
-    title: "Qualidade da Água",
-    description: "Água saindo muito turva e com cheiro forte de barro.",
-    address: "Rua Voluntários da Pátria, Botafogo",
-    city: "Rio de Janeiro",
-    timeAgo: "Há 3 h",
-    likesCount: 12,
-    commentsCount: 4,
-    latitude: -22.9515,
-    longitude: -43.1850,
-    webX: 48,
-    webY: 62,
-  },
-  {
-    id: "6",
-    type: "quality",
-    title: "Qualidade da Água",
-    description: "Água com coloração escura/marrom direto da torneira.",
-    address: "Rua Nelson Mandela, Botafogo",
-    city: "Rio de Janeiro",
-    timeAgo: "Há 5 h",
-    likesCount: 19,
-    commentsCount: 7,
-    latitude: -22.9500,
-    longitude: -43.1810,
-    webX: 82,
-    webY: 68,
-  },
-  {
-    id: "7",
-    type: "leak",
-    title: "Vazamento",
-    description: "Vazamento oculto no asfalto criando buraco na via.",
-    address: "Rua São Clemente, Botafogo",
-    city: "Rio de Janeiro",
-    timeAgo: "Há 8 h",
-    likesCount: 5,
-    commentsCount: 1,
-    latitude: -22.9560,
-    longitude: -43.1910,
-    webX: 25,
-    webY: 79,
-  },
-];
 
 const mapStyle = [
   {
@@ -241,7 +133,9 @@ export default function MapTab() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
-  const [selectedOccurrence, setSelectedOccurrence] = useState<Occurrence | null>(null);
+  const [selectedOccurrence, setSelectedOccurrence] = useState<OccurrenceDetail | null>(null);
+  const [pins, setPins] = useState<OccurrenceMapPin[]>([]);
+  const [isLoadingPins, setIsLoadingPins] = useState(true);
 
   const [isBottomSheetVisible, setIsBottomSheetVisible] = useState(false);
   const justSelectedMarker = useRef(false);
@@ -253,20 +147,77 @@ export default function MapTab() {
     { type: "quality", label: "Qualidade", color: theme.colors.status.success, bg: theme.colors.status.successBg, Icon: AlertTriangle },
   ];
 
-  const filteredOccurrences = mockOccurrences.filter((occ) => {
-    if (selectedFilter && occ.type !== selectedFilter) return false;
-    if (searchQuery.trim().length > 0) {
-      const query = searchQuery.toLowerCase();
-      return (
-        occ.address.toLowerCase().includes(query) ||
-        occ.description.toLowerCase().includes(query) ||
-        occ.city.toLowerCase().includes(query)
-      );
+  useEffect(() => {
+    let active = true;
+    async function loadPins() {
+      try {
+        setIsLoadingPins(true);
+        const data = await occurrencesService.findForMap();
+        if (active) setPins(data);
+      } catch (error) {
+        console.error("Error loading map pins:", error);
+      } finally {
+        if (active) setIsLoadingPins(false);
+      }
     }
+    loadPins();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleRegionChangeComplete = async (region: any) => {
+    if (Platform.OS === "web") return;
+    const minLat = region.latitude - region.latitudeDelta / 2;
+    const maxLat = region.latitude + region.latitudeDelta / 2;
+    const minLng = region.longitude - region.longitudeDelta / 2;
+    const maxLng = region.longitude + region.longitudeDelta / 2;
+    
+    try {
+      const data = await occurrencesService.findForMap({
+        minLat,
+        maxLat,
+        minLng,
+        maxLng,
+        limit: 100
+      });
+      setPins(data);
+    } catch (error) {
+      console.error("Error updating pins on region change:", error);
+    }
+  };
+
+  const handleSearch = async () => {
+    if (searchQuery.trim().length === 0) return;
+    try {
+      const results = await geocode(searchQuery);
+      if (results && results.length > 0) {
+        const best = results[0];
+        if (Platform.OS !== "web" && mapRef.current) {
+          mapRef.current.animateToRegion(
+            {
+              latitude: best.lat,
+              longitude: best.lng,
+              latitudeDelta: 0.015,
+              longitudeDelta: 0.015,
+            },
+            600
+          );
+        }
+      } else {
+        Alert.alert("Local não encontrado", "Não foi possível encontrar a localização informada.");
+      }
+    } catch (err) {
+      console.warn("Geocoding failed:", err);
+    }
+  };
+
+  const filteredPins = pins.filter((pin) => {
+    if (selectedFilter && pin.type !== selectedFilter) return false;
     return true;
   });
 
-  const handleSelectOccurrence = (occurrence: Occurrence) => {
+  const handleSelectOccurrence = async (pin: OccurrenceMapPin) => {
     justSelectedMarker.current = true;
     setTimeout(() => {
       justSelectedMarker.current = false;
@@ -277,14 +228,56 @@ export default function MapTab() {
       closeTimeoutRef.current = null;
     }
 
-    setSelectedOccurrence(occurrence);
+    setSelectedOccurrence({
+      id: pin.id,
+      type: pin.type as any,
+      title: getCategoryDetails(pin.type).label,
+      description: "Carregando descrição...",
+      address: "Carregando endereço...",
+      city: "",
+      timeAgo: "Carregando...",
+      likesCount: 0,
+      commentsCount: 0,
+      latitude: pin.latitude,
+      longitude: pin.longitude,
+    });
     setIsBottomSheetVisible(true);
+
+    try {
+      const data = await occurrencesService.findById(pin.id);
+      
+      let addressStr = "Endereço indisponível";
+      try {
+        const resolved = await reverseGeocode(Number(data.latitude), Number(data.longitude));
+        addressStr = resolved.address;
+      } catch (err) {
+        console.warn("Reverse geocode failed for map pin:", err);
+      }
+
+      setSelectedOccurrence({
+        id: data.id,
+        type: data.type,
+        title: getCategoryDetails(data.type).label,
+        description: data.description || "Nenhuma descrição fornecida.",
+        address: addressStr,
+        city: data.city,
+        timeAgo: formatTimeAgo(data.createdAt),
+        likesCount: data.likesCount,
+        commentsCount: data.commentsCount,
+        latitude: Number(data.latitude),
+        longitude: Number(data.longitude),
+      });
+    } catch (error) {
+      console.error("Error loading pin details:", error);
+      Alert.alert("Erro", "Não foi possível carregar os detalhes do relato.");
+      setIsBottomSheetVisible(false);
+    }
 
     if (Platform.OS !== "web" && mapRef.current) {
       mapRef.current.animateToRegion(
         {
-          latitude: occurrence.latitude,
-          longitude: occurrence.longitude,
+          latitude: pin.latitude,
+          longitude: pin.longitude,
           latitudeDelta: 0.015,
           longitudeDelta: 0.015,
         },
@@ -340,16 +333,16 @@ export default function MapTab() {
               initialLat={INITIAL_REGION.latitude}
               initialLng={INITIAL_REGION.longitude}
               initialZoom={14}
-              markers={filteredOccurrences.map((occ) => ({
-                id: occ.id,
-                latitude: occ.latitude,
-                longitude: occ.longitude,
-                color: getCategoryDetails(occ.type).color,
-                icon: renderIcon(occ.type, "#FFFFFF", 16),
+              markers={filteredPins.map((pin) => ({
+                id: pin.id,
+                latitude: pin.latitude,
+                longitude: pin.longitude,
+                color: getCategoryDetails(pin.type).color,
+                icon: renderIcon(pin.type, "#FFFFFF", 16),
               }))}
               onMarkerPress={(id: string) => {
-                const occ = filteredOccurrences.find((o) => o.id === id);
-                if (occ) handleSelectOccurrence(occ);
+                const pin = filteredPins.find((p) => p.id === id);
+                if (pin) handleSelectOccurrence(pin);
               }}
               onMapPress={handleCloseDetails}
             />
@@ -368,20 +361,21 @@ export default function MapTab() {
           showsCompass={false}
           toolbarEnabled={false}
           onPress={handleCloseDetails}
+          onRegionChangeComplete={handleRegionChangeComplete}
         >
-          {filteredOccurrences.map((occ) => {
-            const config = getCategoryDetails(occ.type);
+          {filteredPins.map((pin) => {
+            const config = getCategoryDetails(pin.type);
             return (
               <Marker
-                key={occ.id}
-                coordinate={{ latitude: occ.latitude, longitude: occ.longitude }}
+                key={pin.id}
+                coordinate={{ latitude: pin.latitude, longitude: pin.longitude }}
                 onPress={(e: any) => {
                   e.stopPropagation();
-                  handleSelectOccurrence(occ);
+                  handleSelectOccurrence(pin);
                 }}
               >
                 <View style={[styles.markerCircle, { backgroundColor: config.color }]}>
-                  {renderIcon(occ.type, "#FFFFFF", 18)}
+                  {renderIcon(pin.type, "#FFFFFF", 18)}
                 </View>
               </Marker>
             );
@@ -410,6 +404,7 @@ export default function MapTab() {
               setSearchQuery(text);
               if (selectedOccurrence) handleCloseDetails();
             }}
+            onSubmitEditing={handleSearch}
           />
         </View>
 

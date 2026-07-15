@@ -8,11 +8,14 @@ import {
   Platform,
   ScrollView,
   RefreshControl,
+  Modal,
+  TextInput,
 } from "react-native";
 import { Alert } from "../utils/alert";
 import { useRouter, Stack } from "expo-router";
 import { useAuth } from "../context/AuthContext";
 import { occurrencesService } from "../services/api/occurrences.service";
+import { usersService } from "../services/api/users.service";
 import { Button } from "../components/Button";
 import { theme } from "../constants/theme";
 import { CustomHeader } from "../components/CustomHeader";
@@ -24,6 +27,7 @@ import {
   ThumbsUp,
   ChevronRight,
   Pencil,
+  X,
 } from "lucide-react-native";
 
 function formatMemberSince(dateString?: string) {
@@ -44,11 +48,40 @@ function formatMemberSince(dateString?: string) {
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, isAuthenticated, logout, isLoading } = useAuth();
+  const { user, isAuthenticated, logout, isLoading, updateUser } = useAuth();
   
   const [stats, setStats] = useState({ reports: 0, confirmations: 0 });
   const [isStatsLoading, setIsStatsLoading] = useState(!isAuthenticated || !user ? false : true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [newName, setNewName] = useState(user?.name || "");
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const handleOpenEditModal = () => {
+    setNewName(user?.name || "");
+    setIsEditModalVisible(true);
+  };
+
+  const handleSaveProfile = async () => {
+    if (newName.trim().length < 2) {
+      Alert.alert("Nome Inválido", "O nome deve ter pelo menos 2 caracteres.");
+      return;
+    }
+    try {
+      setIsUpdating(true);
+      const updatedUser = await usersService.updateMe({ name: newName.trim() });
+      updateUser({ name: updatedUser.name });
+      Alert.alert("Sucesso", "Perfil atualizado com sucesso!");
+      setIsEditModalVisible(false);
+    } catch (err: any) {
+      console.error("Error updating profile:", err);
+      const msg = err?.response?.data?.message || "Não foi possível atualizar o perfil.";
+      Alert.alert("Erro", msg);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   const fetchStats = useCallback(async () => {
     if (!isAuthenticated || !user) {
@@ -176,9 +209,7 @@ export default function ProfileScreen() {
         <TouchableOpacity
           style={styles.settingCard}
           activeOpacity={0.7}
-          onPress={() => {
-            Alert.alert("Editar Perfil", "Esta funcionalidade será disponibilizada em breve.");
-          }}
+          onPress={handleOpenEditModal}
         >
           <View style={styles.settingLeft}>
             <View style={styles.editIconContainer}>
@@ -223,6 +254,58 @@ export default function ProfileScreen() {
           <Text style={styles.logoutText}>Sair</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal
+        visible={isEditModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsEditModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Editar Perfil</Text>
+              <TouchableOpacity
+                onPress={() => setIsEditModalVisible(false)}
+                style={styles.modalCloseButton}
+              >
+                <X size={20} color="#475569" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.inputLabel}>Nome completo</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={newName}
+              onChangeText={setNewName}
+              placeholder="Digite seu nome"
+              placeholderTextColor="#94A3B8"
+              autoFocus
+            />
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setIsEditModalVisible(false)}
+                disabled={isUpdating}
+              >
+                <Text style={styles.cancelButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={handleSaveProfile}
+                disabled={isUpdating}
+              >
+                {isUpdating ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Salvar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -436,5 +519,84 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 28,
     paddingHorizontal: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  modalContainer: {
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: theme.borderRadius.sheet,
+    padding: 24,
+    width: "100%",
+    maxWidth: 400,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...cardShadow,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: theme.typography.sizes.xxl,
+    fontFamily: theme.typography.fonts.bold,
+    color: theme.colors.text.primary,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  inputLabel: {
+    fontSize: theme.typography.sizes.sm,
+    fontFamily: theme.typography.fonts.semiBold,
+    color: theme.colors.text.secondary,
+    marginBottom: 8,
+  },
+  modalInput: {
+    backgroundColor: theme.colors.lightBg,
+    borderRadius: theme.borderRadius.button,
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+    padding: 12,
+    fontSize: theme.typography.sizes.base,
+    fontFamily: theme.typography.fonts.regular,
+    color: theme.colors.text.primary,
+    marginBottom: 24,
+  },
+  modalFooter: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12,
+  },
+  modalButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: theme.borderRadius.button,
+    justifyContent: "center",
+    alignItems: "center",
+    minWidth: 100,
+  },
+  cancelButton: {
+    backgroundColor: theme.colors.lightBg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  cancelButtonText: {
+    color: theme.colors.text.secondary,
+    fontFamily: theme.typography.fonts.semiBold,
+    fontSize: theme.typography.sizes.base,
+  },
+  saveButton: {
+    backgroundColor: theme.colors.primary,
+  },
+  saveButtonText: {
+    color: "#FFFFFF",
+    fontFamily: theme.typography.fonts.bold,
+    fontSize: theme.typography.sizes.base,
   },
 });

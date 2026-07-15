@@ -11,6 +11,15 @@ export interface AlertOptions {
   onDismiss?: () => void;
 }
 
+type AlertShowFn = (
+  title: string,
+  message?: string,
+  buttons?: AlertButton[],
+  options?: AlertOptions
+) => void;
+
+let alertShowCallback: AlertShowFn | null = null;
+
 export const Alert = {
   alert: (
     title: string,
@@ -18,36 +27,51 @@ export const Alert = {
     buttons?: AlertButton[],
     options?: AlertOptions
   ): void => {
-    if (Platform.OS === "web") {
-      const msg = message ? `${title}\n\n${message}` : title;
-      if (!buttons || buttons.length === 0) {
-        window.alert(msg);
-        return;
-      }
-
-      if (buttons.length === 1) {
-        window.alert(msg);
-        if (buttons[0].onPress) {
-          buttons[0].onPress();
+    if (alertShowCallback) {
+      alertShowCallback(title, message, buttons, options);
+    } else {
+      console.warn("Alert provider not registered. Using standard fallback.");
+      if (Platform.OS === "web") {
+        const msg = message ? `${title}\n\n${message}` : title;
+        if (!buttons || buttons.length === 0) {
+          window.alert(msg);
+          return;
         }
-        return;
-      }
 
-      const cancelBtn = buttons.find((b) => b.style === "cancel");
-      const actionBtn = buttons.find((b) => b.style !== "cancel") || buttons[buttons.length - 1];
+        if (buttons.length === 1) {
+          window.alert(msg);
+          if (buttons[0].onPress) {
+            buttons[0].onPress();
+          }
+          return;
+        }
 
-      const confirmed = window.confirm(msg);
-      if (confirmed) {
-        if (actionBtn && actionBtn.onPress) {
-          actionBtn.onPress();
+        const cancelBtn = buttons.find((b) => b.style === "cancel");
+        const actionBtn = buttons.find((b) => b.style !== "cancel") || buttons[buttons.length - 1];
+
+        const confirmed = window.confirm(msg);
+        if (confirmed) {
+          if (actionBtn && actionBtn.onPress) {
+            actionBtn.onPress();
+          }
+        } else {
+          if (cancelBtn && cancelBtn.onPress) {
+            cancelBtn.onPress();
+          }
         }
       } else {
-        if (cancelBtn && cancelBtn.onPress) {
-          cancelBtn.onPress();
-        }
+        RNAlert.alert(title, message, buttons, options);
       }
-    } else {
-      RNAlert.alert(title, message, buttons, options);
     }
   },
 };
+
+export const registerAlertCallback = (cb: AlertShowFn) => {
+  alertShowCallback = cb;
+  return () => {
+    if (alertShowCallback === cb) {
+      alertShowCallback = null;
+    }
+  };
+};
+

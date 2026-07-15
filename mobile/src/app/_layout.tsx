@@ -1,6 +1,7 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "react-native";
 import { AuthProvider } from "../context/AuthContext";
+import { AlertProvider } from "../context/AlertContext";
 import { useEffect } from "react";
 import { useFonts } from "expo-font";
 import {
@@ -38,30 +39,32 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      <Stack
-        screenOptions={{
-          headerStyle: {
-            backgroundColor: theme.colors.cardBackground,
-          },
-          headerTintColor: theme.colors.headerBlue,
-          headerTitleStyle: {
-            fontFamily: theme.typography.fonts.bold,
-            color: theme.colors.text.primary,
-            fontSize: theme.typography.sizes.xl,
-          },
-          headerShadowVisible: false,
-        }}
-      >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="detalhes/[id]" options={{ title: "Detalhes" }} />
-        <Stack.Screen name="comentarios/[id]" options={{ title: "Comentários" }} />
-        <Stack.Screen name="perfil" options={{ title: "Perfil" }} />
-        <Stack.Screen name="localizacao" options={{ headerShown: false }} />
-      </Stack>
-    </AuthProvider>
+    <AlertProvider>
+      <AuthProvider>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <Stack
+          screenOptions={{
+            headerStyle: {
+              backgroundColor: theme.colors.cardBackground,
+            },
+            headerTintColor: theme.colors.headerBlue,
+            headerTitleStyle: {
+              fontFamily: theme.typography.fonts.bold,
+              color: theme.colors.text.primary,
+              fontSize: theme.typography.sizes.xl,
+            },
+            headerShadowVisible: false,
+          }}
+        >
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+          <Stack.Screen name="detalhes/[id]" options={{ title: "Detalhes" }} />
+          <Stack.Screen name="comentarios/[id]" options={{ title: "Comentários" }} />
+          <Stack.Screen name="perfil" options={{ title: "Perfil" }} />
+          <Stack.Screen name="localizacao" options={{ headerShown: false }} />
+        </Stack>
+      </AuthProvider>
+    </AlertProvider>
   );
 }
 
