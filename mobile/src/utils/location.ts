@@ -118,7 +118,6 @@ export async function geocode(query: string): Promise<GeocodeResult[]> {
         return data.map((item: any) => {
           const addr = item.address;
           const street = addr.road || addr.pedestrian || addr.suburb || "";
-          const houseNumber = addr.house_number || "";
           const neighborhood = addr.neighbourhood || addr.suburb || addr.city_district || "";
           const city = addr.city || addr.town || addr.village || addr.municipality || "";
           const state = addr.state || "";

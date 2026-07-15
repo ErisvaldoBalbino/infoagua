@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from "react";
+import React, { createContext, useEffect, useState } from "react";
 import {
   Modal,
   StyleSheet,
@@ -33,8 +33,8 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
     title: "",
   });
 
-  const scaleAnim = useRef(new Animated.Value(0.95)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [scaleAnim] = useState(() => new Animated.Value(0.95));
+  const [fadeAnim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     const unsubscribe = registerAlertCallback((title, message, buttons, options) => {
@@ -69,7 +69,7 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
         }),
       ]).start();
     }
-  }, [alertState.visible]);
+  }, [alertState.visible, fadeAnim, scaleAnim]);
 
   const handleClose = (callback?: () => void) => {
     Animated.parallel([

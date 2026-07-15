@@ -113,7 +113,6 @@ export default function LocationScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<GeocodeResult[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<AddressData>(() => {
     if (params.currentAddress) {
       return {
@@ -164,20 +163,15 @@ export default function LocationScreen() {
   // Debounced geocoding search for text queries
   useEffect(() => {
     if (searchQuery.trim().length < 3) {
-      setSuggestions([]);
-      setShowSuggestions(false);
       return;
     }
     const delay = setTimeout(async () => {
       try {
-        setIsSearching(true);
         const results = await geocode(searchQuery);
         setSuggestions(results);
         setShowSuggestions(results.length > 0);
       } catch (e) {
         console.warn("Error fetching geocoding suggestions:", e);
-      } finally {
-        setIsSearching(false);
       }
     }, 500);
     return () => clearTimeout(delay);
@@ -337,6 +331,10 @@ export default function LocationScreen() {
               value={searchQuery}
               onChangeText={(text) => {
                 setSearchQuery(text);
+                if (text.trim().length < 3) {
+                  setSuggestions([]);
+                  setShowSuggestions(false);
+                }
               }}
               onFocus={() => {
                 if (suggestions.length > 0) setShowSuggestions(true);

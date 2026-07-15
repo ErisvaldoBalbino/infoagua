@@ -135,7 +135,6 @@ export default function MapTab() {
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
   const [selectedOccurrence, setSelectedOccurrence] = useState<OccurrenceDetail | null>(null);
   const [pins, setPins] = useState<OccurrenceMapPin[]>([]);
-  const [isLoadingPins, setIsLoadingPins] = useState(true);
 
   const [isBottomSheetVisible, setIsBottomSheetVisible] = useState(false);
   const justSelectedMarker = useRef(false);
@@ -151,13 +150,10 @@ export default function MapTab() {
     let active = true;
     async function loadPins() {
       try {
-        setIsLoadingPins(true);
         const data = await occurrencesService.findForMap();
         if (active) setPins(data);
       } catch (error) {
         console.error("Error loading map pins:", error);
-      } finally {
-        if (active) setIsLoadingPins(false);
       }
     }
     loadPins();
