@@ -1,19 +1,19 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   StyleSheet,
   Text,
   View,
   TouchableOpacity,
-  TextInput,
   Platform,
-  ScrollView,
-  Keyboard,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { ArrowLeft, Search, MapPin } from "lucide-react-native";
+import { ArrowLeft, MapPin } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "../components/Button";
 import { theme } from "../constants/theme";
+import { reverseGeocode, requestLocationPermissions, GeocodeResult } from "../utils/location";
+import * as Location from "expo-location";
+import { AddressSearchBar } from "../components/AddressSearchBar";
 
 let WebLocationMap: any = null;
 if (Platform.OS === "web") {
@@ -37,8 +37,6 @@ if (Platform.OS !== "web") {
   }
 }
 
-
-
 interface AddressData {
   address: string;
   details: string;
@@ -47,50 +45,13 @@ interface AddressData {
   lng: number;
 }
 
-const mockAddresses: AddressData[] = [
-  {
-    address: "Av. Boa Viagem, 1234",
-    details: "Boa Viagem, Recife - PE, 51011-000",
-    city: "Recife",
-    lat: -8.1156,
-    lng: -34.8924,
-  },
-  {
-    address: "Rua do Hospício, 200",
-    details: "Boa Vista, Recife - PE, 50060-080",
-    city: "Recife",
-    lat: -8.0585,
-    lng: -34.8845,
-  },
-  {
-    address: "Rua da Moeda, 50",
-    details: "Bairro do Recife, Recife - PE, 50030-040",
-    city: "Recife",
-    lat: -8.0632,
-    lng: -34.8711,
-  },
-  {
-    address: "Av. Agamenon Magalhães, 2990",
-    details: "Espinheiro, Recife - PE, 52020-000",
-    city: "Recife",
-    lat: -8.0495,
-    lng: -34.8961,
-  },
-  {
-    address: "Rua Amélia, 450",
-    details: "Graças, Recife - PE, 52011-050",
-    city: "Recife",
-    lat: -8.0425,
-    lng: -34.9015,
-  },
-  {
-    address: "Estrada do Encanamento, 800",
-    details: "Casa Forte, Recife - PE, 52070-000",
-    city: "Recife",
-    lat: -8.0315,
-    lng: -34.9180,
-  },
-];
+const DEFAULT_ADDRESS: AddressData = {
+  address: "Av. Boa Viagem, 1234",
+  details: "Boa Viagem, Recife - PE",
+  city: "Recife",
+  lat: -8.1156,
+  lng: -34.8924,
+};
 
 const mapStyle = [
   {
@@ -147,41 +108,109 @@ export default function LocationScreen() {
   const insets = useSafeAreaInsets();
   const mapRef = useRef<any>(null);
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isResolvingAddress, setIsResolvingAddress] = useState(false);
+  const addressRequestCounter = useRef(0);
+
   const [selectedAddress, setSelectedAddress] = useState<AddressData>(() => {
     if (params.currentAddress) {
-      const found = mockAddresses.find(
-        (a) => a.address === params.currentAddress
-      );
-      if (found) {
-        return found;
-      } else {
-        return {
-          address: String(params.currentAddress),
-          details: params.currentDetails ? String(params.currentDetails) : "",
-          city: params.currentCity ? String(params.currentCity) : "Recife",
-          lat: params.currentLat ? Number(params.currentLat) : -8.1156,
-          lng: params.currentLng ? Number(params.currentLng) : -34.8924,
-        };
+      return {
+        address: String(params.currentAddress),
+        details: params.currentDetails ? String(params.currentDetails) : "",
+        city: params.currentCity ? String(params.currentCity) : "",
+        lat: params.currentLat ? Number(params.currentLat) : -8.1156,
+        lng: params.currentLng ? Number(params.currentLng) : -34.8924,
+      };
+    }
+    return DEFAULT_ADDRESS;
+  });
+
+  const resolveAddressForCoordinates = async (latitude: number, longitude: number) => {
+    const reqId = ++addressRequestCounter.current;
+    setIsResolvingAddress(true);
+    setSelectedAddress((prev) => ({
+      ...prev,
+      lat: latitude,
+      lng: longitude,
+      address: "Carregando endereço...",
+      details: "Buscando localização..."
+    }));
+    try {
+      const info = await reverseGeocode(latitude, longitude);
+      if (reqId === addressRequestCounter.current) {
+        setSelectedAddress({
+          address: info.address,
+          details: info.details,
+          city: info.city,
+          lat: latitude,
+          lng: longitude
+        });
+        setIsResolvingAddress(false);
+      }
+    } catch (err) {
+      console.warn("Reverse geocoding failed on coordinates resolution:", err);
+      if (reqId === addressRequestCounter.current) {
+        setSelectedAddress({
+          address: `Ponto selecionado`,
+          details: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+          city: "",
+          lat: latitude,
+          lng: longitude
+        });
+        setIsResolvingAddress(false);
       }
     }
-    return mockAddresses[0];
-  });
+  };
 
-  const filteredSuggestions = mockAddresses.filter((item) => {
-    const q = searchQuery.toLowerCase();
-    return (
-      item.address.toLowerCase().includes(q) ||
-      item.details.toLowerCase().includes(q)
-    );
-  });
+  useEffect(() => {
+    async function getCurrentLocation() {
+      if (params.currentAddress) return;
+      const reqId = ++addressRequestCounter.current;
+      setIsResolvingAddress(true);
+      try {
+        const hasPermission = await requestLocationPermissions();
+        if (hasPermission) {
+          const loc = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          const info = await reverseGeocode(loc.coords.latitude, loc.coords.longitude);
+          if (reqId === addressRequestCounter.current) {
+            const addressObj = {
+              address: info.address,
+              details: info.details,
+              city: info.city,
+              lat: loc.coords.latitude,
+              lng: loc.coords.longitude,
+            };
+            setSelectedAddress(addressObj);
+            setIsResolvingAddress(false);
+            if (Platform.OS !== "web" && mapRef.current) {
+              mapRef.current.animateToRegion({
+                latitude: loc.coords.latitude,
+                longitude: loc.coords.longitude,
+                latitudeDelta: 0.008,
+                longitudeDelta: 0.008,
+              }, 600);
+            }
+          }
+        } else {
+          if (reqId === addressRequestCounter.current) {
+            setIsResolvingAddress(false);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to get current location on mount:", err);
+        if (reqId === addressRequestCounter.current) {
+          setIsResolvingAddress(false);
+        }
+      }
+    }
+    getCurrentLocation();
+  }, [params.currentAddress]);
 
-  const handleSelectSuggestion = (addressItem: AddressData) => {
+  const handleSelectSuggestion = (addressItem: GeocodeResult) => {
+    addressRequestCounter.current++;
     setSelectedAddress(addressItem);
-    setSearchQuery("");
-    setShowSuggestions(false);
-    Keyboard.dismiss();
+    setIsResolvingAddress(false);
 
     if (Platform.OS !== "web" && mapRef.current) {
       mapRef.current.animateToRegion(
@@ -209,8 +238,6 @@ export default function LocationScreen() {
     });
   };
 
-
-
   return (
     <View style={styles.container}>
       {/* 1. Header Navigation */}
@@ -236,16 +263,7 @@ export default function LocationScreen() {
               centerLat={selectedAddress.lat}
               centerLng={selectedAddress.lng}
               onMapPress={(lat: number, lng: number) => {
-                let closest = mockAddresses[0];
-                let minDistance = Infinity;
-                mockAddresses.forEach((addr) => {
-                  const d = Math.pow(addr.lat - lat, 2) + Math.pow(addr.lng - lng, 2);
-                  if (d < minDistance) {
-                    minDistance = d;
-                    closest = addr;
-                  }
-                });
-                setSelectedAddress(closest);
+                resolveAddressForCoordinates(lat, lng);
               }}
             />
           )
@@ -263,16 +281,7 @@ export default function LocationScreen() {
             customMapStyle={mapStyle}
             onPress={(e: any) => {
               const { latitude, longitude } = e.nativeEvent.coordinate;
-              let closest = mockAddresses[0];
-              let minDistance = Infinity;
-              mockAddresses.forEach((addr) => {
-                const d = Math.pow(addr.lat - latitude, 2) + Math.pow(addr.lng - longitude, 2);
-                if (d < minDistance) {
-                  minDistance = d;
-                  closest = addr;
-                }
-              });
-              setSelectedAddress(closest);
+              resolveAddressForCoordinates(latitude, longitude);
             }}
           >
             <Marker
@@ -292,53 +301,10 @@ export default function LocationScreen() {
 
         {/* 3. Floating Search Bar overlay */}
         <View style={styles.searchOverlayContainer}>
-          <View style={styles.searchBar}>
-            <Search size={20} color="#94A3B8" style={styles.searchIcon} />
-            <TextInput
-              placeholder="Digite seu endereço ou CEP"
-              placeholderTextColor="#94A3B8"
-              style={styles.searchInput}
-              value={searchQuery}
-              onChangeText={(text) => {
-                setSearchQuery(text);
-                setShowSuggestions(text.trim().length > 0);
-              }}
-              onFocus={() => {
-                if (searchQuery.trim().length > 0) setShowSuggestions(true);
-              }}
-            />
-          </View>
-
-          {/* Autocomplete Suggestions */}
-          {showSuggestions && (
-            <View style={styles.suggestionsContainer}>
-              <ScrollView
-                keyboardShouldPersistTaps="handled"
-                style={styles.suggestionsScroll}
-              >
-                {filteredSuggestions.length > 0 ? (
-                  filteredSuggestions.map((item, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={styles.suggestionItem}
-                      activeOpacity={0.7}
-                      onPress={() => handleSelectSuggestion(item)}
-                    >
-                      <MapPin size={16} color="#64748B" style={styles.suggestionIcon} />
-                      <View>
-                        <Text style={styles.suggestionTitle}>{item.address}</Text>
-                        <Text style={styles.suggestionSub}>{item.details}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))
-                ) : (
-                  <View style={styles.noSuggestionItem}>
-                    <Text style={styles.noSuggestionText}>Nenhum endereço encontrado</Text>
-                  </View>
-                )}
-              </ScrollView>
-            </View>
-          )}
+          <AddressSearchBar
+            placeholder="Digite seu endereço ou CEP"
+            onSelectAddress={handleSelectSuggestion}
+          />
         </View>
       </View>
 
@@ -360,6 +326,7 @@ export default function LocationScreen() {
           title="Confirmar Localização"
           onPress={handleConfirmLocation}
           variant="primary"
+          disabled={isResolvingAddress || selectedAddress.address === "Carregando endereço..."}
         />
       </View>
     </View>
@@ -611,7 +578,6 @@ const styles = StyleSheet.create({
     color: theme.colors.text.secondary,
     marginTop: 4,
   },
-  // Confirm button styles have been extracted to Button component
   manualButton: {
     alignItems: "center",
     paddingVertical: 8,

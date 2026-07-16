@@ -8,6 +8,7 @@ import {
   Platform,
   TextInput,
   ScrollView,
+  Image,
 } from "react-native";
 import { Alert } from "../../utils/alert";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -24,9 +25,11 @@ import {
   Camera,
 } from "lucide-react-native";
 import { occurrencesService, OccurrenceType } from "../../services/api/occurrences.service";
+import { storageService } from "../../services/api/storage.service";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "../../components/Button";
 import { theme } from "../../constants/theme";
+import * as ImagePicker from "expo-image-picker";
 
 export default function ReportTab() {
   const router = useRouter();
@@ -44,12 +47,16 @@ export default function ReportTab() {
 
   useEffect(() => {
     if (isAuthenticated && !isLocationSelected) {
-      router.replace("/localizacao");
+      const timer = setTimeout(() => {
+        router.replace("/localizacao");
+      }, 50);
+      return () => clearTimeout(timer);
     }
   }, [isAuthenticated, isLocationSelected, router]);
 
   const [selectedCategory, setSelectedCategory] = useState<OccurrenceType>("shortage");
   const [description, setDescription] = useState("");
+  const [imageUri, setImageUri] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const categories = [
@@ -72,24 +79,86 @@ export default function ReportTab() {
     });
   };
 
+  const handleSelectImage = async () => {
+    Alert.alert(
+      "Adicionar Evidência",
+      "Escolha como deseja adicionar a foto:",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Tirar Foto",
+          onPress: async () => {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== "granted") {
+              Alert.alert("Permissão necessária", "Precisamos de permissão para acessar sua câmera.");
+              return;
+            }
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ["images"],
+              allowsEditing: true,
+              aspect: [4, 3],
+              quality: 0.8,
+            });
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+              setImageUri(result.assets[0].uri);
+            }
+          },
+        },
+        {
+          text: "Escolher da Galeria",
+          onPress: async () => {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== "granted") {
+              Alert.alert("Permissão necessária", "Precisamos de permissão para acessar sua galeria.");
+              return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ["images"],
+              allowsEditing: true,
+              aspect: [4, 3],
+              quality: 0.8,
+            });
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+              setImageUri(result.assets[0].uri);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleSend = async () => {
     if (!isLocationSelected) return;
     setIsSubmitting(true);
+    let photoUrl: string | undefined = undefined;
     try {
+      if (imageUri) {
+        photoUrl = await storageService.uploadFile(imageUri);
+      }
+
       await occurrencesService.create({
         type: selectedCategory,
         latitude,
         longitude,
         city,
         description,
+        photoUrl,
       });
 
       Alert.alert("Sucesso", "Ocorrência enviada com sucesso!");
 
       setDescription("");
+      setImageUri(null);
       router.push("/(tabs)/mapa");
     } catch (error: any) {
       console.error("Erro ao enviar ocorrência:", error);
+      if (photoUrl) {
+        try {
+          await storageService.deleteFile(photoUrl);
+        } catch (delErr) {
+          console.error("Erro ao remover imagem órfã após falha no relato:", delErr);
+        }
+      }
       const errorMsg = error?.response?.data?.message || "Não foi possível enviar a ocorrência no momento.";
       Alert.alert("Erro ao enviar", errorMsg);
     } finally {
@@ -124,6 +193,14 @@ export default function ReportTab() {
             style={{ width: "100%" }}
           />
         </View>
+      </View>
+    );
+  }
+
+  if (!isLocationSelected) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
@@ -215,10 +292,27 @@ export default function ReportTab() {
       {/* 4. Evidence (Optional) */}
       <View style={styles.sectionContainer}>
         <Text style={styles.sectionTitle}>Evidência (Opcional)</Text>
-        <TouchableOpacity style={styles.evidenceCard} activeOpacity={0.8}>
-          <Camera size={32} color="#94A3B8" />
-          <Text style={styles.evidenceText}>Toque para adicionar foto</Text>
-        </TouchableOpacity>
+        {imageUri ? (
+          <View style={styles.previewContainer}>
+            <Image source={{ uri: imageUri }} style={styles.previewImage} resizeMode="cover" />
+            <TouchableOpacity
+              style={styles.removeImageButton}
+              activeOpacity={0.7}
+              onPress={() => setImageUri(null)}
+            >
+              <Text style={styles.removeImageText}>Remover Foto</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.evidenceCard}
+            activeOpacity={0.8}
+            onPress={handleSelectImage}
+          >
+            <Camera size={32} color="#94A3B8" />
+            <Text style={styles.evidenceText}>Toque para adicionar foto</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* 5. Submit Button */}
@@ -301,7 +395,6 @@ const styles = StyleSheet.create({
     marginBottom: 28,
     paddingHorizontal: 8,
   },
-  // Login button styles have been extracted to Button component
   locationCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -414,6 +507,32 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fonts.semiBold,
     color: theme.colors.text.secondary,
     marginTop: 8,
+  },
+  previewContainer: {
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+    overflow: "hidden",
+    alignItems: "center",
+    padding: 12,
+  },
+  previewImage: {
+    width: "100%",
+    height: 200,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  removeImageButton: {
+    backgroundColor: "#FEE2E2",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  removeImageText: {
+    color: "#EF4444",
+    fontFamily: theme.typography.fonts.bold,
+    fontSize: 14,
   },
 });
 

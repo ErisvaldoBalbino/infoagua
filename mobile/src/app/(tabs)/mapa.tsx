@@ -1,9 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   StyleSheet,
   Text,
   View,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   Platform,
@@ -11,14 +10,19 @@ import {
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  Search,
   Compass,
   Droplet,
   Wrench,
   AlertTriangle,
+  CheckCircle,
 } from "lucide-react-native";
 import { OccurrenceBottomSheet } from "../../components/OccurrenceBottomSheet";
 import { theme } from "../../constants/theme";
+import { occurrencesService, OccurrenceMapPin } from "../../services/api/occurrences.service";
+import { reverseGeocode, GeocodeResult } from "../../utils/location";
+import { AddressSearchBar } from "../../components/AddressSearchBar";
+import { formatTimeAgo } from "../../utils/occurrence-utils";
+import { Alert } from "../../utils/alert";
 
 let WebMapView: any = null;
 if (Platform.OS === "web") {
@@ -42,9 +46,7 @@ if (Platform.OS !== "web") {
   }
 }
 
-// Dimensions and Animated are now handled inside the components.
-
-interface Occurrence {
+interface OccurrenceDetail {
   id: string;
   type: "shortage" | "leak" | "quality" | "return";
   title: string;
@@ -56,117 +58,7 @@ interface Occurrence {
   commentsCount: number;
   latitude: number;
   longitude: number;
-  webX: number;
-  webY: number;
 }
-
-const mockOccurrences: Occurrence[] = [
-  {
-    id: "1",
-    type: "shortage",
-    title: "Falta D'Água",
-    description: "Sem água desde ontem de manhã na rua inteira.",
-    address: "Rua Marquês de Abrantes, Flamengo",
-    city: "Rio de Janeiro",
-    timeAgo: "Há 45 min",
-    likesCount: 15,
-    commentsCount: 6,
-    latitude: -22.9284,
-    longitude: -43.1780,
-    webX: 62,
-    webY: 22,
-  },
-  {
-    id: "2",
-    type: "shortage",
-    title: "Falta D'Água",
-    description: "Pressão fraca e depois cortou por completo.",
-    address: "Rua Senador Vergueiro, Flamengo",
-    city: "Rio de Janeiro",
-    timeAgo: "Há 2 h",
-    likesCount: 8,
-    commentsCount: 2,
-    latitude: -22.9340,
-    longitude: -43.1790,
-    webX: 22,
-    webY: 33,
-  },
-  {
-    id: "3",
-    type: "shortage",
-    title: "Falta D'Água",
-    description: "Abastecimento suspenso para manutenção programada.",
-    address: "Avenida Rui Barbosa, Flamengo",
-    city: "Rio de Janeiro",
-    timeAgo: "Há 4 h",
-    likesCount: 11,
-    commentsCount: 3,
-    latitude: -22.9375,
-    longitude: -43.1730,
-    webX: 72,
-    webY: 41,
-  },
-  {
-    id: "4",
-    type: "leak",
-    title: "Vazamento",
-    description: "Cano estourado na calçada, jorrando muita água limpa.",
-    address: "Avenida Oswaldo Cruz, Botafogo",
-    city: "Rio de Janeiro",
-    timeAgo: "Há 1 h",
-    likesCount: 24,
-    commentsCount: 9,
-    latitude: -22.9435,
-    longitude: -43.1785,
-    webX: 38,
-    webY: 49,
-  },
-  {
-    id: "5",
-    type: "quality",
-    title: "Qualidade da Água",
-    description: "Água saindo muito turva e com cheiro forte de barro.",
-    address: "Rua Voluntários da Pátria, Botafogo",
-    city: "Rio de Janeiro",
-    timeAgo: "Há 3 h",
-    likesCount: 12,
-    commentsCount: 4,
-    latitude: -22.9515,
-    longitude: -43.1850,
-    webX: 48,
-    webY: 62,
-  },
-  {
-    id: "6",
-    type: "quality",
-    title: "Qualidade da Água",
-    description: "Água com coloração escura/marrom direto da torneira.",
-    address: "Rua Nelson Mandela, Botafogo",
-    city: "Rio de Janeiro",
-    timeAgo: "Há 5 h",
-    likesCount: 19,
-    commentsCount: 7,
-    latitude: -22.9500,
-    longitude: -43.1810,
-    webX: 82,
-    webY: 68,
-  },
-  {
-    id: "7",
-    type: "leak",
-    title: "Vazamento",
-    description: "Vazamento oculto no asfalto criando buraco na via.",
-    address: "Rua São Clemente, Botafogo",
-    city: "Rio de Janeiro",
-    timeAgo: "Há 8 h",
-    likesCount: 5,
-    commentsCount: 1,
-    latitude: -22.9560,
-    longitude: -43.1910,
-    webX: 25,
-    webY: 79,
-  },
-];
 
 const mapStyle = [
   {
@@ -228,10 +120,10 @@ const mapStyle = [
 ];
 
 const INITIAL_REGION = {
-  latitude: -22.9410,
-  longitude: -43.1810,
-  latitudeDelta: 0.038,
-  longitudeDelta: 0.038,
+  latitude: -5.7945,
+  longitude: -35.2110,
+  latitudeDelta: 0.08,
+  longitudeDelta: 0.08,
 };
 
 export default function MapTab() {
@@ -239,34 +131,85 @@ export default function MapTab() {
   const mapRef = useRef<any>(null);
   const insets = useSafeAreaInsets();
 
-  const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
-  const [selectedOccurrence, setSelectedOccurrence] = useState<Occurrence | null>(null);
+  const [selectedOccurrence, setSelectedOccurrence] = useState<OccurrenceDetail | null>(null);
+  const [pins, setPins] = useState<OccurrenceMapPin[]>([]);
+  const [webMapCenter, setWebMapCenter] = useState<{ lat: number; lng: number } | undefined>(undefined);
 
   const [isBottomSheetVisible, setIsBottomSheetVisible] = useState(false);
   const justSelectedMarker = useRef(false);
   const closeTimeoutRef = useRef<any>(null);
+  const latestRequestId = useRef(0);
+  const selectedPinIdRef = useRef<string | null>(null);
 
   const categories = [
     { type: "shortage", label: "Falta d'água", color: theme.colors.status.danger, bg: theme.colors.status.dangerBg, Icon: Droplet },
     { type: "leak", label: "Vazamento", color: theme.colors.status.warning, bg: theme.colors.status.warningBg, Icon: Wrench },
     { type: "quality", label: "Qualidade", color: theme.colors.status.success, bg: theme.colors.status.successBg, Icon: AlertTriangle },
+    { type: "return", label: "Retorno", color: theme.colors.primary, bg: theme.colors.lightBg, Icon: CheckCircle },
   ];
 
-  const filteredOccurrences = mockOccurrences.filter((occ) => {
-    if (selectedFilter && occ.type !== selectedFilter) return false;
-    if (searchQuery.trim().length > 0) {
-      const query = searchQuery.toLowerCase();
-      return (
-        occ.address.toLowerCase().includes(query) ||
-        occ.description.toLowerCase().includes(query) ||
-        occ.city.toLowerCase().includes(query)
-      );
+  const fetchPins = async (params?: any) => {
+    const requestId = ++latestRequestId.current;
+    try {
+      const data = await occurrencesService.findForMap(params);
+      if (requestId === latestRequestId.current) {
+        setPins(data);
+      }
+    } catch (error) {
+      if (params) {
+        console.error("Error updating pins on region change:", error);
+      } else {
+        console.error("Error loading map pins:", error);
+      }
     }
+  };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchPins();
+  }, []);
+
+  const handleRegionChangeComplete = async (region: any) => {
+    if (Platform.OS === "web") return;
+    const minLat = region.latitude - region.latitudeDelta / 2;
+    const maxLat = region.latitude + region.latitudeDelta / 2;
+    const minLng = region.longitude - region.longitudeDelta / 2;
+    const maxLng = region.longitude + region.longitudeDelta / 2;
+    
+    fetchPins({
+      minLat,
+      maxLat,
+      minLng,
+      maxLng,
+      limit: 100
+    });
+  };
+
+  const handleSelectSuggestion = (addressItem: GeocodeResult) => {
+    if (selectedOccurrence) handleCloseDetails();
+    if (Platform.OS !== "web" && mapRef.current) {
+      mapRef.current.animateToRegion(
+        {
+          latitude: addressItem.lat,
+          longitude: addressItem.lng,
+          latitudeDelta: 0.015,
+          longitudeDelta: 0.015,
+        },
+        600
+      );
+    } else if (Platform.OS === "web") {
+      setWebMapCenter({ lat: addressItem.lat, lng: addressItem.lng });
+    }
+  };
+
+  const filteredPins = pins.filter((pin) => {
+    if (selectedFilter && pin.type !== selectedFilter) return false;
     return true;
   });
 
-  const handleSelectOccurrence = (occurrence: Occurrence) => {
+  const handleSelectOccurrence = async (pin: OccurrenceMapPin) => {
+    selectedPinIdRef.current = pin.id;
     justSelectedMarker.current = true;
     setTimeout(() => {
       justSelectedMarker.current = false;
@@ -277,19 +220,67 @@ export default function MapTab() {
       closeTimeoutRef.current = null;
     }
 
-    setSelectedOccurrence(occurrence);
+    setSelectedOccurrence({
+      id: pin.id,
+      type: pin.type as any,
+      title: getCategoryDetails(pin.type).label,
+      description: "Carregando descrição...",
+      address: "Carregando endereço...",
+      city: "",
+      timeAgo: "Carregando...",
+      likesCount: 0,
+      commentsCount: 0,
+      latitude: pin.latitude,
+      longitude: pin.longitude,
+    });
     setIsBottomSheetVisible(true);
+
+    try {
+      const data = await occurrencesService.findById(pin.id);
+      if (selectedPinIdRef.current !== pin.id) return;
+      
+      let addressStr = "Endereço indisponível";
+      try {
+        const resolved = await reverseGeocode(Number(data.latitude), Number(data.longitude));
+        addressStr = resolved.address;
+      } catch (err) {
+        console.warn("Reverse geocode failed for map pin:", err);
+      }
+
+      if (selectedPinIdRef.current !== pin.id) return;
+
+      setSelectedOccurrence({
+        id: data.id,
+        type: data.type,
+        title: getCategoryDetails(data.type).label,
+        description: data.description || "Nenhuma descrição fornecida.",
+        address: addressStr,
+        city: data.city,
+        timeAgo: formatTimeAgo(data.createdAt),
+        likesCount: data.likesCount,
+        commentsCount: data.commentsCount,
+        latitude: Number(data.latitude),
+        longitude: Number(data.longitude),
+      });
+    } catch (error) {
+      if (selectedPinIdRef.current !== pin.id) return;
+      console.error("Error loading pin details:", error);
+      Alert.alert("Erro", "Não foi possível carregar os detalhes do relato.");
+      setIsBottomSheetVisible(false);
+    }
 
     if (Platform.OS !== "web" && mapRef.current) {
       mapRef.current.animateToRegion(
         {
-          latitude: occurrence.latitude,
-          longitude: occurrence.longitude,
+          latitude: pin.latitude,
+          longitude: pin.longitude,
           latitudeDelta: 0.015,
           longitudeDelta: 0.015,
         },
         500
       );
+    } else if (Platform.OS === "web") {
+      setWebMapCenter({ lat: pin.latitude, lng: pin.longitude });
     }
   };
 
@@ -310,6 +301,8 @@ export default function MapTab() {
   const handleRecenter = () => {
     if (Platform.OS !== "web" && mapRef.current) {
       mapRef.current.animateToRegion(INITIAL_REGION, 600);
+    } else if (Platform.OS === "web") {
+      setWebMapCenter({ lat: INITIAL_REGION.latitude, lng: INITIAL_REGION.longitude });
     }
   };
 
@@ -325,6 +318,8 @@ export default function MapTab() {
         return <Wrench size={size} color={color} />;
       case "quality":
         return <AlertTriangle size={size} color={color} />;
+      case "return":
+        return <CheckCircle size={size} color={color} />;
       default:
         return <AlertTriangle size={size} color={color} />;
     }
@@ -340,16 +335,18 @@ export default function MapTab() {
               initialLat={INITIAL_REGION.latitude}
               initialLng={INITIAL_REGION.longitude}
               initialZoom={14}
-              markers={filteredOccurrences.map((occ) => ({
-                id: occ.id,
-                latitude: occ.latitude,
-                longitude: occ.longitude,
-                color: getCategoryDetails(occ.type).color,
-                icon: renderIcon(occ.type, "#FFFFFF", 16),
+              centerLat={webMapCenter?.lat}
+              centerLng={webMapCenter?.lng}
+              markers={filteredPins.map((pin) => ({
+                id: pin.id,
+                latitude: pin.latitude,
+                longitude: pin.longitude,
+                color: getCategoryDetails(pin.type).color,
+                icon: renderIcon(pin.type, "#FFFFFF", 16),
               }))}
               onMarkerPress={(id: string) => {
-                const occ = filteredOccurrences.find((o) => o.id === id);
-                if (occ) handleSelectOccurrence(occ);
+                const pin = filteredPins.find((p) => p.id === id);
+                if (pin) handleSelectOccurrence(pin);
               }}
               onMapPress={handleCloseDetails}
             />
@@ -368,20 +365,21 @@ export default function MapTab() {
           showsCompass={false}
           toolbarEnabled={false}
           onPress={handleCloseDetails}
+          onRegionChangeComplete={handleRegionChangeComplete}
         >
-          {filteredOccurrences.map((occ) => {
-            const config = getCategoryDetails(occ.type);
+          {filteredPins.map((pin) => {
+            const config = getCategoryDetails(pin.type);
             return (
               <Marker
-                key={occ.id}
-                coordinate={{ latitude: occ.latitude, longitude: occ.longitude }}
+                key={pin.id}
+                coordinate={{ latitude: pin.latitude, longitude: pin.longitude }}
                 onPress={(e: any) => {
                   e.stopPropagation();
-                  handleSelectOccurrence(occ);
+                  handleSelectOccurrence(pin);
                 }}
               >
                 <View style={[styles.markerCircle, { backgroundColor: config.color }]}>
-                  {renderIcon(occ.type, "#FFFFFF", 18)}
+                  {renderIcon(pin.type, "#FFFFFF", 18)}
                 </View>
               </Marker>
             );
@@ -399,19 +397,10 @@ export default function MapTab() {
         pointerEvents={Platform.OS === "web" ? undefined : "box-none"}
       >
         {/* Search Bar */}
-        <View style={styles.searchBarContainer}>
-          <Search size={20} color="#94A3B8" style={styles.searchIcon} />
-          <TextInput
-            placeholder="Buscar cidade, bairro ou rua..."
-            placeholderTextColor="#94A3B8"
-            style={styles.searchInput}
-            value={searchQuery}
-            onChangeText={(text) => {
-              setSearchQuery(text);
-              if (selectedOccurrence) handleCloseDetails();
-            }}
-          />
-        </View>
+        <AddressSearchBar
+          placeholder="Buscar cidade, bairro ou rua..."
+          onSelectAddress={handleSelectSuggestion}
+        />
 
         {/* Scrollable Filter Pills */}
         <View
