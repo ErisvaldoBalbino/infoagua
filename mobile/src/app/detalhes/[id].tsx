@@ -169,25 +169,26 @@ export default function DetailsScreen() {
           const data = await occurrencesService.findById(id);
           setOccurrence(data);
           setLikesCount(data.likesCount);
+          setIsLoading(false);
 
-          try {
-            const resolved = await reverseGeocode(Number(data.latitude), Number(data.longitude));
-            setAddressInfo({
-              address: resolved.address,
-              details: resolved.details,
+          reverseGeocode(Number(data.latitude), Number(data.longitude))
+            .then((resolved) => {
+              setAddressInfo({
+                address: resolved.address,
+                details: resolved.details,
+              });
+            })
+            .catch((e) => {
+              console.warn("Reverse geocoding failed in details screen:", e);
+              setAddressInfo({
+                address: `Ponto próximo a lat/lng: ${Number(data.latitude).toFixed(4)}, ${Number(data.longitude).toFixed(4)}`,
+                details: data.city,
+              });
             });
-          } catch (e) {
-            console.warn("Reverse geocoding failed in details screen:", e);
-            setAddressInfo({
-              address: `Ponto próximo a lat/lng: ${Number(data.latitude).toFixed(4)}, ${Number(data.longitude).toFixed(4)}`,
-              details: data.city,
-            });
-          }
         }
       } catch (error) {
         console.error("Error loading occurrence details:", error);
         setHasError(true);
-      } finally {
         setIsLoading(false);
       }
     }

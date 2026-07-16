@@ -10,6 +10,7 @@ import {
   RefreshControl,
   Modal,
   TextInput,
+  KeyboardAvoidingView,
 } from "react-native";
 import { Alert } from "../utils/alert";
 import { useRouter, Stack } from "expo-router";
@@ -259,52 +260,62 @@ export default function ProfileScreen() {
         visible={isEditModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setIsEditModalVisible(false)}
+        onRequestClose={() => {
+          if (!isUpdating) setIsEditModalVisible(false);
+        }}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Editar Perfil</Text>
-              <TouchableOpacity
-                onPress={() => setIsEditModalVisible(false)}
-                style={styles.modalCloseButton}
-              >
-                <X size={20} color="#475569" />
-              </TouchableOpacity>
-            </View>
+        <KeyboardAvoidingView
+          behavior="padding"
+          style={{ flex: 1 }}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Editar Perfil</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (!isUpdating) setIsEditModalVisible(false);
+                  }}
+                  disabled={isUpdating}
+                  style={styles.modalCloseButton}
+                >
+                  <X size={20} color="#475569" />
+                </TouchableOpacity>
+              </View>
 
-            <Text style={styles.inputLabel}>Nome completo</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={newName}
-              onChangeText={setNewName}
-              placeholder="Digite seu nome"
-              placeholderTextColor="#94A3B8"
-              autoFocus
-            />
+              <Text style={styles.inputLabel}>Nome completo</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={newName}
+                onChangeText={setNewName}
+                placeholder="Digite seu nome"
+                placeholderTextColor="#94A3B8"
+                autoFocus
+              />
 
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setIsEditModalVisible(false)}
-                disabled={isUpdating}
-              >
-                <Text style={styles.cancelButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
-                onPress={handleSaveProfile}
-                disabled={isUpdating}
-              >
-                {isUpdating ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.saveButtonText}>Salvar</Text>
-                )}
-              </TouchableOpacity>
+              <View style={styles.modalFooter}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => setIsEditModalVisible(false)}
+                  disabled={isUpdating}
+                >
+                  <Text style={styles.cancelButtonText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.saveButton]}
+                  onPress={handleSaveProfile}
+                  disabled={isUpdating}
+                >
+                  {isUpdating ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.saveButtonText}>Salvar</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

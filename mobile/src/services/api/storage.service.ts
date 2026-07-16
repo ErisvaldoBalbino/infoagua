@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import { api } from "./client";
 
 export interface UploadResponse {
@@ -20,18 +21,24 @@ export const storageService = {
       fileType = "image/webp";
     }
 
-    formData.append("file", {
-      uri,
-      name: fileName,
-      type: fileType,
-    } as any);
+    if (Platform.OS === "web") {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      formData.append("file", blob, fileName);
+    } else {
+      formData.append("file", {
+        uri,
+        name: fileName,
+        type: fileType,
+      } as any);
+    }
 
-    const response = await api.post<UploadResponse>("/storage/upload", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+    const response = await api.post<UploadResponse>("/storage/upload", formData);
     
     return response.data.url;
+  },
+
+  deleteFile: async (url: string): Promise<void> => {
+    await api.delete("/storage/delete", { data: { url } });
   },
 };

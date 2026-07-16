@@ -3,7 +3,6 @@ import {
   StyleSheet,
   Text,
   View,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   Platform,
@@ -11,16 +10,17 @@ import {
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  Search,
   Compass,
   Droplet,
   Wrench,
   AlertTriangle,
+  CheckCircle,
 } from "lucide-react-native";
 import { OccurrenceBottomSheet } from "../../components/OccurrenceBottomSheet";
 import { theme } from "../../constants/theme";
 import { occurrencesService, OccurrenceMapPin } from "../../services/api/occurrences.service";
-import { reverseGeocode, geocode } from "../../utils/location";
+import { reverseGeocode, GeocodeResult } from "../../utils/location";
+import { AddressSearchBar } from "../../components/AddressSearchBar";
 import { formatTimeAgo } from "../../utils/occurrence-utils";
 import { Alert } from "../../utils/alert";
 
@@ -120,10 +120,10 @@ const mapStyle = [
 ];
 
 const INITIAL_REGION = {
-  latitude: -22.9410,
-  longitude: -43.1810,
-  latitudeDelta: 0.038,
-  longitudeDelta: 0.038,
+  latitude: -5.7945,
+  longitude: -35.2110,
+  latitudeDelta: 0.08,
+  longitudeDelta: 0.08,
 };
 
 export default function MapTab() {
@@ -131,35 +131,43 @@ export default function MapTab() {
   const mapRef = useRef<any>(null);
   const insets = useSafeAreaInsets();
 
-  const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
   const [selectedOccurrence, setSelectedOccurrence] = useState<OccurrenceDetail | null>(null);
   const [pins, setPins] = useState<OccurrenceMapPin[]>([]);
+  const [webMapCenter, setWebMapCenter] = useState<{ lat: number; lng: number } | undefined>(undefined);
 
   const [isBottomSheetVisible, setIsBottomSheetVisible] = useState(false);
   const justSelectedMarker = useRef(false);
   const closeTimeoutRef = useRef<any>(null);
+  const latestRequestId = useRef(0);
+  const selectedPinIdRef = useRef<string | null>(null);
 
   const categories = [
     { type: "shortage", label: "Falta d'água", color: theme.colors.status.danger, bg: theme.colors.status.dangerBg, Icon: Droplet },
     { type: "leak", label: "Vazamento", color: theme.colors.status.warning, bg: theme.colors.status.warningBg, Icon: Wrench },
     { type: "quality", label: "Qualidade", color: theme.colors.status.success, bg: theme.colors.status.successBg, Icon: AlertTriangle },
+    { type: "return", label: "Retorno", color: theme.colors.primary, bg: theme.colors.lightBg, Icon: CheckCircle },
   ];
 
-  useEffect(() => {
-    let active = true;
-    async function loadPins() {
-      try {
-        const data = await occurrencesService.findForMap();
-        if (active) setPins(data);
-      } catch (error) {
+  const fetchPins = async (params?: any) => {
+    const requestId = ++latestRequestId.current;
+    try {
+      const data = await occurrencesService.findForMap(params);
+      if (requestId === latestRequestId.current) {
+        setPins(data);
+      }
+    } catch (error) {
+      if (params) {
+        console.error("Error updating pins on region change:", error);
+      } else {
         console.error("Error loading map pins:", error);
       }
     }
-    loadPins();
-    return () => {
-      active = false;
-    };
+  };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchPins();
   }, []);
 
   const handleRegionChangeComplete = async (region: any) => {
@@ -169,42 +177,29 @@ export default function MapTab() {
     const minLng = region.longitude - region.longitudeDelta / 2;
     const maxLng = region.longitude + region.longitudeDelta / 2;
     
-    try {
-      const data = await occurrencesService.findForMap({
-        minLat,
-        maxLat,
-        minLng,
-        maxLng,
-        limit: 100
-      });
-      setPins(data);
-    } catch (error) {
-      console.error("Error updating pins on region change:", error);
-    }
+    fetchPins({
+      minLat,
+      maxLat,
+      minLng,
+      maxLng,
+      limit: 100
+    });
   };
 
-  const handleSearch = async () => {
-    if (searchQuery.trim().length === 0) return;
-    try {
-      const results = await geocode(searchQuery);
-      if (results && results.length > 0) {
-        const best = results[0];
-        if (Platform.OS !== "web" && mapRef.current) {
-          mapRef.current.animateToRegion(
-            {
-              latitude: best.lat,
-              longitude: best.lng,
-              latitudeDelta: 0.015,
-              longitudeDelta: 0.015,
-            },
-            600
-          );
-        }
-      } else {
-        Alert.alert("Local não encontrado", "Não foi possível encontrar a localização informada.");
-      }
-    } catch (err) {
-      console.warn("Geocoding failed:", err);
+  const handleSelectSuggestion = (addressItem: GeocodeResult) => {
+    if (selectedOccurrence) handleCloseDetails();
+    if (Platform.OS !== "web" && mapRef.current) {
+      mapRef.current.animateToRegion(
+        {
+          latitude: addressItem.lat,
+          longitude: addressItem.lng,
+          latitudeDelta: 0.015,
+          longitudeDelta: 0.015,
+        },
+        600
+      );
+    } else if (Platform.OS === "web") {
+      setWebMapCenter({ lat: addressItem.lat, lng: addressItem.lng });
     }
   };
 
@@ -214,6 +209,7 @@ export default function MapTab() {
   });
 
   const handleSelectOccurrence = async (pin: OccurrenceMapPin) => {
+    selectedPinIdRef.current = pin.id;
     justSelectedMarker.current = true;
     setTimeout(() => {
       justSelectedMarker.current = false;
@@ -241,6 +237,7 @@ export default function MapTab() {
 
     try {
       const data = await occurrencesService.findById(pin.id);
+      if (selectedPinIdRef.current !== pin.id) return;
       
       let addressStr = "Endereço indisponível";
       try {
@@ -249,6 +246,8 @@ export default function MapTab() {
       } catch (err) {
         console.warn("Reverse geocode failed for map pin:", err);
       }
+
+      if (selectedPinIdRef.current !== pin.id) return;
 
       setSelectedOccurrence({
         id: data.id,
@@ -264,6 +263,7 @@ export default function MapTab() {
         longitude: Number(data.longitude),
       });
     } catch (error) {
+      if (selectedPinIdRef.current !== pin.id) return;
       console.error("Error loading pin details:", error);
       Alert.alert("Erro", "Não foi possível carregar os detalhes do relato.");
       setIsBottomSheetVisible(false);
@@ -279,6 +279,8 @@ export default function MapTab() {
         },
         500
       );
+    } else if (Platform.OS === "web") {
+      setWebMapCenter({ lat: pin.latitude, lng: pin.longitude });
     }
   };
 
@@ -299,6 +301,8 @@ export default function MapTab() {
   const handleRecenter = () => {
     if (Platform.OS !== "web" && mapRef.current) {
       mapRef.current.animateToRegion(INITIAL_REGION, 600);
+    } else if (Platform.OS === "web") {
+      setWebMapCenter({ lat: INITIAL_REGION.latitude, lng: INITIAL_REGION.longitude });
     }
   };
 
@@ -314,6 +318,8 @@ export default function MapTab() {
         return <Wrench size={size} color={color} />;
       case "quality":
         return <AlertTriangle size={size} color={color} />;
+      case "return":
+        return <CheckCircle size={size} color={color} />;
       default:
         return <AlertTriangle size={size} color={color} />;
     }
@@ -329,6 +335,8 @@ export default function MapTab() {
               initialLat={INITIAL_REGION.latitude}
               initialLng={INITIAL_REGION.longitude}
               initialZoom={14}
+              centerLat={webMapCenter?.lat}
+              centerLng={webMapCenter?.lng}
               markers={filteredPins.map((pin) => ({
                 id: pin.id,
                 latitude: pin.latitude,
@@ -389,20 +397,10 @@ export default function MapTab() {
         pointerEvents={Platform.OS === "web" ? undefined : "box-none"}
       >
         {/* Search Bar */}
-        <View style={styles.searchBarContainer}>
-          <Search size={20} color="#94A3B8" style={styles.searchIcon} />
-          <TextInput
-            placeholder="Buscar cidade, bairro ou rua..."
-            placeholderTextColor="#94A3B8"
-            style={styles.searchInput}
-            value={searchQuery}
-            onChangeText={(text) => {
-              setSearchQuery(text);
-              if (selectedOccurrence) handleCloseDetails();
-            }}
-            onSubmitEditing={handleSearch}
-          />
-        </View>
+        <AddressSearchBar
+          placeholder="Buscar cidade, bairro ou rua..."
+          onSelectAddress={handleSelectSuggestion}
+        />
 
         {/* Scrollable Filter Pills */}
         <View

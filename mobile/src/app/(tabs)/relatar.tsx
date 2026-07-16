@@ -130,9 +130,8 @@ export default function ReportTab() {
   const handleSend = async () => {
     if (!isLocationSelected) return;
     setIsSubmitting(true);
+    let photoUrl: string | undefined = undefined;
     try {
-      let photoUrl: string | undefined = undefined;
-
       if (imageUri) {
         photoUrl = await storageService.uploadFile(imageUri);
       }
@@ -153,6 +152,13 @@ export default function ReportTab() {
       router.push("/(tabs)/mapa");
     } catch (error: any) {
       console.error("Erro ao enviar ocorrência:", error);
+      if (photoUrl) {
+        try {
+          await storageService.deleteFile(photoUrl);
+        } catch (delErr) {
+          console.error("Erro ao remover imagem órfã após falha no relato:", delErr);
+        }
+      }
       const errorMsg = error?.response?.data?.message || "Não foi possível enviar a ocorrência no momento.";
       Alert.alert("Erro ao enviar", errorMsg);
     } finally {

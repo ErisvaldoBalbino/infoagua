@@ -45,7 +45,7 @@ export async function reverseGeocode(latitude: number, longitude: number): Promi
         return {
           address: mainAddress,
           details: details,
-          city: city || "Recife",
+          city: city || "",
         };
       }
     } catch (e) {
@@ -54,7 +54,7 @@ export async function reverseGeocode(latitude: number, longitude: number): Promi
     return {
       address: `Ponto próximo a: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
       details: "Localização",
-      city: "Recife",
+      city: "",
     };
   }
 
@@ -80,7 +80,7 @@ export async function reverseGeocode(latitude: number, longitude: number): Promi
       return {
         address: mainAddress,
         details: details,
-        city: city || "Recife",
+        city: city || "",
       };
     }
   } catch (e) {
@@ -90,7 +90,7 @@ export async function reverseGeocode(latitude: number, longitude: number): Promi
   return {
     address: `Ponto próximo a: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
     details: "Localização",
-    city: "Recife",
+    city: "",
   };
 }
 
@@ -130,7 +130,7 @@ export async function geocode(query: string): Promise<GeocodeResult[]> {
           return {
             address: mainAddress,
             details: details,
-            city: city || "Recife",
+            city: city || "",
             lat: parseFloat(item.lat),
             lng: parseFloat(item.lon),
           };
@@ -162,7 +162,7 @@ export async function geocode(query: string): Promise<GeocodeResult[]> {
             return {
               address: query,
               details: `Lat: ${loc.latitude.toFixed(4)}, Lng: ${loc.longitude.toFixed(4)}`,
-              city: "Recife",
+              city: "",
               lat: loc.latitude,
               lng: loc.longitude,
             };

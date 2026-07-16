@@ -4,18 +4,16 @@ import {
   Text,
   View,
   TouchableOpacity,
-  TextInput,
   Platform,
-  ScrollView,
-  Keyboard,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { ArrowLeft, Search, MapPin } from "lucide-react-native";
+import { ArrowLeft, MapPin } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "../components/Button";
 import { theme } from "../constants/theme";
-import { geocode, reverseGeocode, requestLocationPermissions, GeocodeResult } from "../utils/location";
+import { reverseGeocode, requestLocationPermissions, GeocodeResult } from "../utils/location";
 import * as Location from "expo-location";
+import { AddressSearchBar } from "../components/AddressSearchBar";
 
 let WebLocationMap: any = null;
 if (Platform.OS === "web") {
@@ -110,15 +108,15 @@ export default function LocationScreen() {
   const insets = useSafeAreaInsets();
   const mapRef = useRef<any>(null);
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [suggestions, setSuggestions] = useState<GeocodeResult[]>([]);
+  const [isResolvingAddress, setIsResolvingAddress] = useState(false);
+  const addressRequestCounter = useRef(0);
+
   const [selectedAddress, setSelectedAddress] = useState<AddressData>(() => {
     if (params.currentAddress) {
       return {
         address: String(params.currentAddress),
         details: params.currentDetails ? String(params.currentDetails) : "",
-        city: params.currentCity ? String(params.currentCity) : "Recife",
+        city: params.currentCity ? String(params.currentCity) : "",
         lat: params.currentLat ? Number(params.currentLat) : -8.1156,
         lng: params.currentLng ? Number(params.currentLng) : -34.8924,
       };
@@ -126,9 +124,48 @@ export default function LocationScreen() {
     return DEFAULT_ADDRESS;
   });
 
+  const resolveAddressForCoordinates = async (latitude: number, longitude: number) => {
+    const reqId = ++addressRequestCounter.current;
+    setIsResolvingAddress(true);
+    setSelectedAddress((prev) => ({
+      ...prev,
+      lat: latitude,
+      lng: longitude,
+      address: "Carregando endereço...",
+      details: "Buscando localização..."
+    }));
+    try {
+      const info = await reverseGeocode(latitude, longitude);
+      if (reqId === addressRequestCounter.current) {
+        setSelectedAddress({
+          address: info.address,
+          details: info.details,
+          city: info.city,
+          lat: latitude,
+          lng: longitude
+        });
+        setIsResolvingAddress(false);
+      }
+    } catch (err) {
+      console.warn("Reverse geocoding failed on coordinates resolution:", err);
+      if (reqId === addressRequestCounter.current) {
+        setSelectedAddress({
+          address: `Ponto selecionado`,
+          details: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+          city: "",
+          lat: latitude,
+          lng: longitude
+        });
+        setIsResolvingAddress(false);
+      }
+    }
+  };
+
   useEffect(() => {
     async function getCurrentLocation() {
       if (params.currentAddress) return;
+      const reqId = ++addressRequestCounter.current;
+      setIsResolvingAddress(true);
       try {
         const hasPermission = await requestLocationPermissions();
         if (hasPermission) {
@@ -136,52 +173,44 @@ export default function LocationScreen() {
             accuracy: Location.Accuracy.Balanced,
           });
           const info = await reverseGeocode(loc.coords.latitude, loc.coords.longitude);
-          const addressObj = {
-            address: info.address,
-            details: info.details,
-            city: info.city,
-            lat: loc.coords.latitude,
-            lng: loc.coords.longitude,
-          };
-          setSelectedAddress(addressObj);
-          if (Platform.OS !== "web" && mapRef.current) {
-            mapRef.current.animateToRegion({
-              latitude: loc.coords.latitude,
-              longitude: loc.coords.longitude,
-              latitudeDelta: 0.008,
-              longitudeDelta: 0.008,
-            }, 600);
+          if (reqId === addressRequestCounter.current) {
+            const addressObj = {
+              address: info.address,
+              details: info.details,
+              city: info.city,
+              lat: loc.coords.latitude,
+              lng: loc.coords.longitude,
+            };
+            setSelectedAddress(addressObj);
+            setIsResolvingAddress(false);
+            if (Platform.OS !== "web" && mapRef.current) {
+              mapRef.current.animateToRegion({
+                latitude: loc.coords.latitude,
+                longitude: loc.coords.longitude,
+                latitudeDelta: 0.008,
+                longitudeDelta: 0.008,
+              }, 600);
+            }
+          }
+        } else {
+          if (reqId === addressRequestCounter.current) {
+            setIsResolvingAddress(false);
           }
         }
       } catch (err) {
         console.warn("Failed to get current location on mount:", err);
+        if (reqId === addressRequestCounter.current) {
+          setIsResolvingAddress(false);
+        }
       }
     }
     getCurrentLocation();
   }, [params.currentAddress]);
 
-  // Debounced geocoding search for text queries
-  useEffect(() => {
-    if (searchQuery.trim().length < 3) {
-      return;
-    }
-    const delay = setTimeout(async () => {
-      try {
-        const results = await geocode(searchQuery);
-        setSuggestions(results);
-        setShowSuggestions(results.length > 0);
-      } catch (e) {
-        console.warn("Error fetching geocoding suggestions:", e);
-      }
-    }, 500);
-    return () => clearTimeout(delay);
-  }, [searchQuery]);
-
   const handleSelectSuggestion = (addressItem: GeocodeResult) => {
+    addressRequestCounter.current++;
     setSelectedAddress(addressItem);
-    setSearchQuery("");
-    setShowSuggestions(false);
-    Keyboard.dismiss();
+    setIsResolvingAddress(false);
 
     if (Platform.OS !== "web" && mapRef.current) {
       mapRef.current.animateToRegion(
@@ -233,33 +262,8 @@ export default function LocationScreen() {
               lng={selectedAddress.lng}
               centerLat={selectedAddress.lat}
               centerLng={selectedAddress.lng}
-              onMapPress={async (lat: number, lng: number) => {
-                setSelectedAddress((prev) => ({
-                  ...prev,
-                  lat: lat,
-                  lng: lng,
-                  address: "Carregando endereço...",
-                  details: "Buscando localização..."
-                }));
-                try {
-                  const info = await reverseGeocode(lat, lng);
-                  setSelectedAddress({
-                    address: info.address,
-                    details: info.details,
-                    city: info.city,
-                    lat: lat,
-                    lng: lng
-                  });
-                } catch (err) {
-                  console.warn("Reverse geocoding failed on web map press:", err);
-                  setSelectedAddress({
-                    address: `Ponto selecionado`,
-                    details: `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
-                    city: "Recife",
-                    lat: lat,
-                    lng: lng
-                  });
-                }
+              onMapPress={(lat: number, lng: number) => {
+                resolveAddressForCoordinates(lat, lng);
               }}
             />
           )
@@ -275,34 +279,9 @@ export default function LocationScreen() {
               longitudeDelta: 0.008,
             }}
             customMapStyle={mapStyle}
-            onPress={async (e: any) => {
+            onPress={(e: any) => {
               const { latitude, longitude } = e.nativeEvent.coordinate;
-              setSelectedAddress((prev) => ({
-                ...prev,
-                lat: latitude,
-                lng: longitude,
-                address: "Carregando endereço...",
-                details: "Buscando localização..."
-              }));
-              try {
-                const info = await reverseGeocode(latitude, longitude);
-                setSelectedAddress({
-                  address: info.address,
-                  details: info.details,
-                  city: info.city,
-                  lat: latitude,
-                  lng: longitude
-                });
-              } catch (err) {
-                console.warn("Reverse geocoding failed on map press:", err);
-                setSelectedAddress({
-                  address: `Ponto selecionado`,
-                  details: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
-                  city: "Recife",
-                  lat: latitude,
-                  lng: longitude
-                });
-              }
+              resolveAddressForCoordinates(latitude, longitude);
             }}
           >
             <Marker
@@ -322,56 +301,10 @@ export default function LocationScreen() {
 
         {/* 3. Floating Search Bar overlay */}
         <View style={styles.searchOverlayContainer}>
-          <View style={styles.searchBar}>
-            <Search size={20} color="#94A3B8" style={styles.searchIcon} />
-            <TextInput
-              placeholder="Digite seu endereço ou CEP"
-              placeholderTextColor="#94A3B8"
-              style={styles.searchInput}
-              value={searchQuery}
-              onChangeText={(text) => {
-                setSearchQuery(text);
-                if (text.trim().length < 3) {
-                  setSuggestions([]);
-                  setShowSuggestions(false);
-                }
-              }}
-              onFocus={() => {
-                if (suggestions.length > 0) setShowSuggestions(true);
-              }}
-            />
-          </View>
-
-          {/* Autocomplete Suggestions */}
-          {showSuggestions && (
-            <View style={styles.suggestionsContainer}>
-              <ScrollView
-                keyboardShouldPersistTaps="handled"
-                style={styles.suggestionsScroll}
-              >
-                {suggestions.length > 0 ? (
-                  suggestions.map((item, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={styles.suggestionItem}
-                      activeOpacity={0.7}
-                      onPress={() => handleSelectSuggestion(item)}
-                    >
-                      <MapPin size={16} color="#64748B" style={styles.suggestionIcon} />
-                      <View>
-                        <Text style={styles.suggestionTitle}>{item.address}</Text>
-                        <Text style={styles.suggestionSub}>{item.details}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))
-                ) : (
-                  <View style={styles.noSuggestionItem}>
-                    <Text style={styles.noSuggestionText}>Nenhum endereço encontrado</Text>
-                  </View>
-                )}
-              </ScrollView>
-            </View>
-          )}
+          <AddressSearchBar
+            placeholder="Digite seu endereço ou CEP"
+            onSelectAddress={handleSelectSuggestion}
+          />
         </View>
       </View>
 
@@ -393,6 +326,7 @@ export default function LocationScreen() {
           title="Confirmar Localização"
           onPress={handleConfirmLocation}
           variant="primary"
+          disabled={isResolvingAddress || selectedAddress.address === "Carregando endereço..."}
         />
       </View>
     </View>

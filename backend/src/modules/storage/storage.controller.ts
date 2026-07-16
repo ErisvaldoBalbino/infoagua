@@ -1,5 +1,7 @@
 import {
+  Body,
   Controller,
+  Delete,
   Post,
   UploadedFile,
   UseGuards,
@@ -63,5 +65,18 @@ export class StorageController {
     @UploadedFile() file: Express.Multer.File,
   ): Promise<UploadResponseDto> {
     return this.storageService.upload(file);
+  }
+
+  // ─── DELETE /storage/delete ──────────────────────────────────────────────────
+
+  @Delete('delete')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  @ApiOperation({ summary: 'Deleta imagem por URL' })
+  @ApiResponse({ status: 200, description: 'Imagem deletada com sucesso' })
+  @ApiResponse({ status: 400, description: 'URL inválida ou malformada' })
+  @ApiResponse({ status: 401, description: 'Token ausente ou inválido' })
+  delete(@Body('url') url: string): Promise<void> {
+    return this.storageService.delete(url);
   }
 }
