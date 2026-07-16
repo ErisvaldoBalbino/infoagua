@@ -1,27 +1,28 @@
 {
   "expo": {
-    "name": "infoagua",
+    "name": "InfoÁgua",
     "slug": "infoagua",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/infoagua-logo.png",
     "scheme": "infoagua",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/infoagua-logo.png"
     },
     "android": {
+      "icon": "./assets/images/infoagua-logo.png",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/infoagua-logo.png",
+        "monochromeImage": "./assets/images/infoagua-logo.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": true,
+      "package": "br.edu.ifrn.infoagua"
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/infoagua-logo.png"
     },
     "plugins": [
       "expo-router",
@@ -30,11 +31,12 @@
         {
           "backgroundColor": "#208AEF",
           "android": {
-            "image": "./assets/images/splash-icon.png",
+            "image": "./assets/images/infoagua-logo.png",
             "imageWidth": 76
           }
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

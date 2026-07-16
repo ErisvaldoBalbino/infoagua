@@ -1,17 +1,21 @@
 # InfoÁgua Mobile 📱
 
-Este diretório contém a aplicação móvel do **InfoÁgua**, desenvolvida utilizando **React Native** e **Expo**.
+Este diretório contém a aplicação móvel do **InfoÁgua**, desenvolvida utilizando **React Native** e **Expo** (fluxo nativo com `expo-dev-client`).
 
-O aplicativo permite que cidadãos reportem a qualidade e a disponibilidade de água em suas regiões, visualizem alertas, comentem e acompanhem previsões do tempo locais.
+O aplicativo permite que cidadãos reportem a qualidade e a disponibilidade de água em suas regiões, visualizem alertas, comentem e acompanhem ocorrências locais.
 
 ---
 
 ## 🛠️ Pré-requisitos
 
-Para rodar e testar o aplicativo móvel, você precisará de:
-*   [Node.js](https://nodejs.org/) (versão LTS recomendada)
-*   Para testar no celular físico: Instale o aplicativo **Expo Go** (disponível na [Google Play Store](https://play.google.com/store/apps/details?id=host.exp.exponent) ou [Apple App Store](https://apps.apple.com/app/expo-go/id984021508)).
-*   Para testar no computador: Emulador Android configurado (via Android Studio) ou Simulador iOS (disponível apenas no macOS via Xcode).
+Para compilar e rodar o app nativamente, você precisará de:
+
+- [Node.js](https://nodejs.org/) (versão LTS recomendada)
+- [Expo CLI](https://docs.expo.dev/more/expo-cli/) — `npm install -g expo-cli` (ou use via `npx`)
+- **Android:** [Android Studio](https://developer.android.com/studio) com o SDK e um emulador/dispositivo configurados
+- **iOS (macOS apenas):** [Xcode](https://developer.apple.com/xcode/) com os Command Line Tools instalados e um simulador ou dispositivo físico conectado
+
+> **Nota:** Este projeto usa `expo-dev-client` e **não** é compatível com o aplicativo Expo Go. É necessário o build nativo completo.
 
 ---
 
@@ -22,25 +26,49 @@ Para rodar e testar o aplicativo móvel, você precisará de:
 npm install
 ```
 
-### 2. Iniciar o servidor de desenvolvimento (Metro Bundler)
+### 2. Gerar os projetos nativos (Android/iOS)
+
+Necessário na primeira vez ou após alterar plugins nativos:
 ```bash
-npm run start
+npx expo prebuild
 ```
-ou usando o Expo CLI diretamente:
+
+### 3. Compilar e iniciar o app
+
+**Android (emulador ou dispositivo físico via USB):**
 ```bash
-npx expo start
+npm run android
+# equivalente a: npx expo run:android
+```
+
+**iOS (apenas macOS — simulador ou dispositivo físico):**
+```bash
+npm run ios
+# equivalente a: npx expo run:ios
+```
+
+**Web (experimental):**
+```bash
+npm run web
+# equivalente a: npx expo start --web
 ```
 
 ---
 
-## 📲 Como testar o aplicativo
+## 🌐 Configuração da URL da API
 
-Após rodar o comando de inicialização, o terminal exibirá um **QR Code** e algumas opções. Escolha a melhor forma de visualizar o app:
+O cliente HTTP resolve automaticamente o endereço do backend por plataforma:
 
-*   **No celular físico (Expo Go):** Abra a câmera do seu celular (iOS) ou o aplicativo Expo Go (Android) e escaneie o QR Code mostrado no terminal. Certifique-se de que o computador e o celular estejam conectados na **mesma rede Wi-Fi**.
-*   **No Emulador Android:** Com o emulador já aberto, pressione `a` no terminal onde o Metro Bundler está rodando.
-*   **No Simulador iOS:** Pressione `i` no terminal para iniciar o app no simulador da Apple.
-*   **No Navegador (Web):** Pressione `w` no terminal para abrir a versão experimental no navegador.
+| Plataforma | URL padrão |
+|---|---|
+| Emulador Android | `http://10.0.2.2:3000/v1` |
+| Simulador iOS / Web | `http://localhost:3000/v1` |
+| Dispositivo físico / CI | `EXPO_PUBLIC_API_URL` (variável de ambiente) |
+
+Para dispositivos físicos ou ambientes de CI, crie um arquivo `.env` na raiz do projeto `mobile/`:
+```env
+EXPO_PUBLIC_API_URL=http://<ip-do-servidor>:3000/v1
+```
 
 ---
 

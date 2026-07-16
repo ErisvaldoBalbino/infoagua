@@ -21,6 +21,22 @@ const PUBLIC_USER_SELECT = {
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async getMyStats(
+    userId: string,
+  ): Promise<{ reports: number; confirmations: number }> {
+    const reports = await this.prisma.occurrence.count({
+      where: { userId },
+    });
+
+    const confirmations = await this.prisma.like.count({
+      where: {
+        occurrence: { userId },
+      },
+    });
+
+    return { reports, confirmations };
+  }
+
   async findById(id: string): Promise<PublicProfileDto> {
     const user = await this.prisma.user.findUnique({
       where: { id },

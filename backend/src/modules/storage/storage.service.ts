@@ -7,6 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import {
   CreateBucketCommand,
+  DeleteObjectCommand,
   HeadBucketCommand,
   PutBucketPolicyCommand,
   PutObjectCommand,
@@ -130,6 +131,22 @@ export class StorageService implements OnModuleInit {
     );
 
     return { url: `${this.publicEndpoint}/${this.bucket}/${key}` };
+  }
+
+  // ─── Delete ─────────────────────────────────────────────────────────────────
+
+  async delete(url: string): Promise<void> {
+    const parts = url.split('/');
+    const key = parts[parts.length - 1];
+    if (!key) {
+      throw new BadRequestException('URL inválida.');
+    }
+    await this.s3.send(
+      new DeleteObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+      }),
+    );
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────
